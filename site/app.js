@@ -232,6 +232,11 @@
   function drawPC(host, j, side) {
     pcFilters(document.getElementById('pcFilters'), j.games, refreshPC);
     var rows = (j.rows || []).slice();
+    if (!rows.length || !rows.some(function (r) { return r.plays; })) {
+      host.innerHTML = ''; document.getElementById('pcNote').textContent = '';
+      host.appendChild(h('p', 'ax', 'No plays match these filters (' + (pcFilterText() || 'none') + '). Try a wider window or clear the filters.'));
+      return;
+    }
     var ft = pcFilterText();
     document.getElementById('pcNote').textContent = (ft ? 'Filtered: ' + ft + '. Ranks show where that number would place against every FBS team\'s full season. ' : '') +
       'Usage = share of plays (or of dropbacks / runs inside those sections). Rel. usage = percentage points above or below the FBS median. ' +
@@ -345,6 +350,7 @@
       'Pass rate = dropbacks (passes and sacks) as a share of runs plus dropbacks. The tick on each bar is the FBS average in the same situation; ' +
       'a <b>lean</b> tag means ' + who + ' pass or run at least 15 points more than average there (10+ plays). ' +
       'SR and EPA are shaded against the FBS average for that situation' + (side === 'Defense' ? ', from the defense\'s point of view (blue = held below average)' : '') + '. Tap a row to see the plays.';
+    if (!j.plays) { host.innerHTML = ''; host.appendChild(h('p', 'ax', 'No plays match these filters. Try a wider window or clear the filters.')); return; }
     var by = {};
     (j.groups || []).forEach(function (g) { (by[g.grp] = by[g.grp] || []).push(g); });
     host.innerHTML = '';
