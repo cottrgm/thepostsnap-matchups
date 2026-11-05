@@ -1,0 +1,43 @@
+
+/* ---------- live playcalling chart + tendencies ---------- */
+.pcfilters{align-items:flex-end}
+.pcfilters .ctl select{min-width:170px}
+.pcchk{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink-2);padding-bottom:7px;cursor:pointer}
+.pcreset{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;border:1px solid var(--axis);border-radius:2px;background:transparent;color:var(--ink-2);cursor:pointer}
+.pcreset:hover{border-color:var(--s1);color:var(--s1)}
+#pcChart,#tdChart{transition:opacity .15s}
+table.pctab{min-width:760px}
+table.pctab td{padding:5px 10px}
+table.pctab tr.sect td{border-top:2px solid var(--axis)}
+td.pcsec{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+td.pclab{color:var(--ink);font-weight:500}
+td.pcbar{min-width:190px;text-align:left!important}
+.pcb{display:inline-block;vertical-align:middle;width:120px;height:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:2px;position:relative;overflow:hidden}
+.pcb i{position:absolute;left:0;top:0;bottom:0;background:var(--s1)}
+.pcb b{position:absolute;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:var(--ink)}
+.pcv{display:inline-block;min-width:44px;margin-left:8px;font-variant-numeric:tabular-nums;color:var(--ink)}
+td.pcrel{min-width:150px;text-align:left!important}
+.pcd{display:inline-block;vertical-align:middle;width:84px;height:12px;position:relative;border-left:0}
+.pcd::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--axis)}
+.pcd i{position:absolute;top:0;bottom:0}
+.pcd i.p{background:var(--s1)} .pcd i.n{background:var(--s2)}
+td.pcshade{text-align:center!important;color:var(--ink);font-variant-numeric:tabular-nums;min-width:74px}
+.tdgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:18px}
+.tdcard{display:flex;flex-direction:column;gap:8px;min-width:0}
+.tdcard h3{font-family:"Big Shoulders Display","Arial Narrow",sans-serif;font-size:17px;text-transform:uppercase;letter-spacing:.04em}
+table.tdtab{min-width:520px}
+table.tdtab td{padding:5px 8px}
+.tdb{width:110px}
+.lean{display:inline-block;margin-left:6px;padding:0 6px;border-radius:2px;font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;vertical-align:1px}
+.lean.p{background:var(--s1);color:var(--surface-1)} .lean.r{background:var(--s2);color:var(--surface-1)}
+dialog.pcsheet{width:min(1100px,calc(100vw - 24px));max-height:calc(100vh - 40px);border:1px solid var(--line);border-radius:6px;padding:18px;background:var(--surface-1);color:var(--ink);box-shadow:0 30px 80px -30px #000}
+dialog.pcsheet::backdrop{background:rgba(10,14,20,.45)}
+.pcsheethead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.pcsheethead h2{font-family:"Big Shoulders Display","Arial Narrow",sans-serif;font-size:22px;text-transform:uppercase;letter-spacing:.02em}
+table.pltab{min-width:900px;font-size:13px}
+table.pltab td{padding:5px 9px}
+table.pltab td.pltext{white-space:normal;text-align:left;min-width:320px;color:var(--ink-2)}
+table.pltab tr.ok td:first-child{box-shadow:inset 3px 0 0 var(--s1)}
+table.pltab tr.no td:first-child{box-shadow:inset 3px 0 0 var(--s2)}
+.gb{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+@media (max-width:680px){ td.pcbar{min-width:160px} .pcb{width:90px} dialog.pcsheet{padding:12px} }

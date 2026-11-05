@@ -1,0 +1,386 @@
+<div class="viz-root">
+<header class="nav">
+  <div class="navin">
+    <a class="wordmark" href="./">
+      <span class="wm-post">THE</span><span class="wm-snap">POST&#8202;SNAP</span>
+    </a>
+    <div class="controls">
+      <label class="ctl">
+        <span>Team</span>
+        <input id="teamInput" list="teamList" autocomplete="off" spellcheck="false" placeholder="Search 136 teams">
+        <datalist id="teamList"></datalist>
+      </label>
+      <label class="ctl">
+        <span>Season</span>
+        <select id="seasonSel"></select>
+      </label>
+      <a class="navlink" href="/matchups">Matchups &#8594;</a>
+    </div>
+  </div>
+</header>
+
+<div id="loading" class="loading"><span class="spin"></span> Reading the play-by-play&hellip;</div>
+
+<div id="content" hidden>
+  <nav class="viewnav" id="viewNav" role="tablist"></nav>
+
+<div class="view" id="viewTeam">
+  <section class="hero">
+    <div class="heroin">
+      <p class="eyebrow" id="heroEyebrow"></p>
+      <h1 id="heroTeam">&mdash;</h1>
+      <p class="lede" id="heroLede"></p>
+      <div class="readout" id="tiles"></div>
+    </div>
+  </section>
+
+  <main id="main">
+    <section class="panel">
+      <div class="phead">
+        <p class="num">01</p>
+        <div>
+          <h2>The ratings</h2>
+          <p>Four independent rating systems, each with its own view of the same team. SP&#8202;+ and FPI are predictive &mdash; how good is this team going forward. Elo is a running record of who beat whom. Where they disagree is usually the interesting part.</p>
+        </div>
+      </div>
+      <div id="ratingChart" class="chartbox"></div>
+      <p class="tblnote" id="ratingNote"></p>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">02</p>
+        <div>
+          <h2>Against the number</h2>
+          <p>What the betting market expected of this team each week, and what actually happened. The line is the crowd's forecast with money behind it, so beating it repeatedly means more than beating a bad opponent.</p>
+        </div>
+      </div>
+      <div id="mktChart" class="chartbox"></div>
+      <div class="tablewrap"><table id="mktTable"></table></div>
+      <p class="tblnote" id="mktNote"></p>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">03</p>
+        <div>
+          <h2>Against the country</h2>
+          <p>Each bar is the distance from the FBS median in that category. Every team in the pool runs through identical code, so the comparison is like&#8209;for&#8209;like. These are raw rates &mdash; the panel below adjusts for who they played.</p>
+        </div>
+      </div>
+      <div class="segs" role="tablist" id="rankTabs"></div>
+      <div class="legend">
+        <span class="lk"><i style="background:var(--pos)"></i>better than median</span>
+        <span class="lk"><i style="background:var(--neg)"></i>worse than median</span>
+        <span class="lk muted">blank = too few plays to rank</span>
+      </div>
+      <div id="rankChart" class="chartbox"></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">04</p>
+        <div>
+          <h2>Adjusted for opponent</h2>
+          <p>The same ideas as above &mdash; efficiency, explosiveness, the run game &mdash; but weighted for the quality of who was on the other sideline. A raw number against a cupcake and the same number against a playoff team are not the same number.</p>
+        </div>
+      </div>
+      <div class="segs" role="tablist" id="adjTabs"></div>
+      <div id="adjChart" class="chartbox"></div>
+      <p class="tblnote" id="adjNote"></p>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">05</p>
+        <div>
+          <h2>Where the ball goes</h2>
+          <p id="zoneNote">Target depth off the line of scrimmage, by direction.</p>
+        </div>
+      </div>
+      <div class="segs" role="tablist" id="zoneTabs"></div>
+      <div id="fieldChart" class="chartbox field"></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">06</p>
+        <div>
+          <h2>Down &amp; distance</h2>
+          <p id="sitNote">What they called down by down, and how often it worked. The snap count sits in every label, because a rate off three plays is not a tendency.</p>
+        </div>
+      </div>
+      <div class="subctl">
+        <div class="segs" role="tablist" id="sitSideTabs"></div>
+        <div class="segs" role="tablist" id="sitTabs"></div>
+      </div>
+      <div id="sitChart" class="chartbox"></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">07</p>
+        <div>
+          <h2>Week by week</h2>
+          <p>What this offense did against what its defense allowed, one point per game &mdash; with the conditions and the market's number alongside.</p>
+        </div>
+      </div>
+      <div id="trendChart" class="chartbox"></div>
+      <div class="tablewrap"><table id="gameTable"></table></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">08</p>
+        <div>
+          <h2>Who did it</h2>
+          <p>Season box score by player, from the official game books. Click any column to re-sort; the tabs swap between the passing, rushing, receiving and defensive lines.</p>
+        </div>
+      </div>
+      <div class="subctl">
+        <div class="segs" role="tablist" id="plTabs"></div>
+        <p class="count" id="plCount"></p>
+      </div>
+      <div class="tablewrap"><table id="plTable" class="sortable"></table></div>
+      <p class="tblnote" id="plNote"></p>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">09</p>
+        <div>
+          <h2>Head to head</h2>
+          <p>Two schools, the same measurements, the same pool. Bar length is where each team sits in the national order &mdash; a full bar is the best in FBS, an empty one is last.</p>
+        </div>
+      </div>
+      <div class="subctl">
+        <label class="ctl">
+          <span>Opponent school</span>
+          <input id="vsInput" list="teamList" autocomplete="off" spellcheck="false" placeholder="Pick a school">
+        </label>
+        <div class="segs" role="tablist" id="h2hTabs"></div>
+      </div>
+      <div id="h2hChart" class="chartbox"></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">10</p>
+        <div>
+          <h2>Conference by conference</h2>
+          <p>Every snap taken by every member, pooled &mdash; a true league rate, not an average of team averages. Click any column to re-sort.</p>
+        </div>
+      </div>
+      <div class="subctl">
+        <div class="segs" role="tablist" id="confSideTabs"></div>
+        <div class="segs" role="tablist" id="confSetTabs"></div>
+      </div>
+      <div class="tablewrap"><table id="confTable" class="sortable"></table></div>
+      <p class="tblnote" id="confNote"></p>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">11</p>
+        <div>
+          <h2>All of FBS, ranked</h2>
+          <p>Every team in the country in one order. Sort by any statistic or by school name, filter to a conference, and the rank column follows whatever you sorted by. Cells are tinted toward teal as they get better and violet as they get worse.</p>
+        </div>
+      </div>
+      <div class="subctl">
+        <div class="segs" role="tablist" id="boardSideTabs"></div>
+        <div class="segs" role="tablist" id="boardSetTabs"></div>
+      </div>
+      <div class="subctl">
+        <label class="ctl">
+          <span>Find a school</span>
+          <input id="boardSearch" autocomplete="off" spellcheck="false" placeholder="Type to filter">
+        </label>
+        <label class="ctl">
+          <span>Conference</span>
+          <select id="boardConf"></select>
+        </label>
+        <p class="count" id="boardCount"></p>
+      </div>
+      <div class="tablewrap tall"><table id="boardTable" class="sortable"></table></div>
+      <p class="tblnote" id="boardNote"></p>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">12</p>
+        <div>
+          <h2>The playcalling chart</h2>
+          <p>How often each kind of play is called, how that compares with the rest of the country, and what it returns. Filter it by opponent or recent games, sort any column, hover a row for its definition and FBS rank, and tap a row to see every play behind it.</p>
+        </div>
+      </div>
+      <div class="subctl">
+        <div class="segs" role="tablist" id="pcSideTabs"></div>
+      </div>
+      <div class="subctl pcfilters" id="pcFilters"></div>
+      <div id="pcChart"></div>
+      <p class="tblnote" id="pcNote"></p>
+      <p class="tblnote"><a id="chartDl" class="dl" href="#" target="_blank" rel="noopener">Download the season sheet as an image &#8594;</a></p>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
+        <p class="num">13</p>
+        <div>
+          <h2>Tendencies</h2>
+          <p>What they do in each situation: down and distance, field position, score, quarter and clock, formation and tempo. Each row shows how often they throw against the national average in that same spot, and how well it works. Tap any row to see the plays.</p>
+        </div>
+      </div>
+      <div class="subctl">
+        <div class="segs" role="tablist" id="tdSideTabs"></div>
+      </div>
+      <div class="subctl pcfilters" id="tdFilters"></div>
+      <div id="tdChart"></div>
+      <p class="tblnote" id="tdNote"></p>
+    </section>
+  </main>
+</div>
+
+<div class="view" id="viewGames" hidden>
+  <section class="hero slim">
+    <div class="heroin">
+      <p class="eyebrow" id="gamesEyebrow"></p>
+      <h1>The slate</h1>
+      <p class="lede">Every game this week with a projected margin built from SP&#8202;+ and a flat home&#8209;field edge, set beside the number the market is actually offering. The gap between the two is the only column worth acting on.</p>
+    </div>
+  </section>
+  <main>
+    <section class="panel">
+      <div class="subctl">
+        <label class="ctl"><span>Week</span><select id="weekSel"></select></label>
+        <label class="ctl"><span>Conference</span><select id="gamesConf"></select></label>
+        <div class="segs" role="tablist" id="gamesFilterTabs"></div>
+        <p class="count" id="gamesCount"></p>
+      </div>
+      <div class="tablewrap"><table id="gamesTable" class="sortable"></table></div>
+      <p class="tblnote" id="gamesNote"></p>
+    </section>
+  </main>
+</div>
+
+<div class="view" id="viewBox" hidden>
+  <section class="hero slim">
+    <div class="heroin">
+      <p class="eyebrow" id="boxEyebrow"></p>
+      <h1 id="boxTitle">&mdash;</h1>
+      <p class="lede" id="boxLede"></p>
+      <div class="readout" id="boxTiles"></div>
+    </div>
+  </section>
+  <main>
+    <section class="panel">
+      <div class="phead"><p class="num">01</p><div>
+        <h2>Side by side</h2>
+        <p>Both teams on the same measurements. The bar shows each team's share of the pair, so a bar past halfway is the team that won that category.</p>
+      </div></div>
+      <div id="boxCompare" class="chartbox"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><p class="num">02</p><div>
+        <h2>Drive by drive</h2>
+        <p>Every possession in order, where it started, how far it got and what it produced &mdash; reconstructed from the play log, since the feed has no drive endpoint.</p>
+      </div></div>
+      <div class="tablewrap tall"><table id="boxDrives"></table></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><p class="num">03</p><div>
+        <h2>The box score</h2>
+        <p>Every player who recorded a stat, from the official game book.</p>
+      </div></div>
+      <div class="subctl">
+        <div class="segs" role="tablist" id="boxTeamTabs"></div>
+        <div class="segs" role="tablist" id="boxStatTabs"></div>
+      </div>
+      <div class="tablewrap"><table id="boxPlayers" class="sortable"></table></div>
+    </section>
+  </main>
+</div>
+
+<div class="view" id="viewLeague" hidden>
+  <section class="hero slim">
+    <div class="heroin">
+      <p class="eyebrow" id="leagueEyebrow"></p>
+      <h1 id="leagueTitle">The league</h1>
+      <p class="lede" id="leagueLede"></p>
+    </div>
+  </section>
+  <main>
+    <section class="panel">
+      <div class="subctl">
+        <div class="segs" role="tablist" id="leagueTabs"></div>
+        <div class="segs" role="tablist" id="leagueSideTabs"></div>
+      </div>
+      <div class="subctl">
+        <label class="ctl"><span>Find a school</span>
+          <input id="leagueSearch" autocomplete="off" spellcheck="false" placeholder="Type to filter"></label>
+        <label class="ctl"><span>Conference</span><select id="leagueConf"></select></label>
+        <p class="count" id="leagueCount"></p>
+      </div>
+      <div class="tablewrap tall"><table id="leagueTable" class="sortable"></table></div>
+      <p class="tblnote" id="leagueNote"></p>
+    </section>
+  </main>
+</div>
+
+<div class="view" id="viewCoaches" hidden>
+  <section class="hero slim">
+    <div class="heroin">
+      <p class="eyebrow">Since 2000</p>
+      <h1>The coaches</h1>
+      <p class="lede">Career records for every head coach with at least two seasons' worth of games, across every school they have led. Click any column to re-sort.</p>
+    </div>
+  </section>
+  <main>
+    <section class="panel">
+      <div class="subctl">
+        <label class="ctl"><span>Find a coach</span>
+          <input id="coachSearch" autocomplete="off" spellcheck="false" placeholder="Type to filter"></label>
+        <p class="count" id="coachCount"></p>
+      </div>
+      <div class="tablewrap tall"><table id="coachTable" class="sortable"></table></div>
+      <p class="tblnote" id="coachNote"></p>
+    </section>
+  </main>
+</div>
+
+
+  <footer class="foot">
+    <div class="footin">
+      <div class="fcol">
+        <h3>The definitions</h3>
+        <p><b>Success rate</b> &mdash; the play gains at least half the distance to go on first down, 70% on second, all of it on third or fourth.</p>
+        <p><b>EPA per play</b> &mdash; CollegeFootballData's Predicted Points Added. On defensive views it is still the opposing offense's EPA, so negative is good.</p>
+        <p><b>Dropbacks</b> &mdash; pass attempts plus sacks. Sacks are charged to the passing game, not to rushing the way a box score does.</p>
+        <p><b>Explosive</b> &mdash; a run of 12+ yards or a pass of 15+.</p>
+        <p><b>Cover margin</b> &mdash; final margin minus what the closing line expected. Positive means they beat the number.</p>
+        <p><b>Line yards</b> &mdash; the share of a run credited to the blocking rather than the back; <b>open field yards</b> are everything past ten.</p>
+      </div>
+      <div class="fcol">
+        <h3>What it can't tell you</h3>
+        <p id="footLimits"></p>
+      </div>
+      <div class="fcol">
+        <h3>Where it comes from</h3>
+        <p>Raw play-by-play, box scores, ratings, betting lines and weather from CollegeFootballData.com &mdash; every FBS snap, both sides of the ball, re-pulled and re-parsed twice a day, at 5:00am and 4:00pm Central.</p>
+        <p id="footFresh"></p>
+        <p>Nothing on this page is typed in by hand. If a number looks wrong, it is wrong in the play log too.</p>
+      </div>
+    </div>
+    <p class="src"><span class="wm-post">THE</span><span class="wm-snap">POST&#8202;SNAP</span> &middot; thepostsnap.com</p>
+  </footer>
+</div>
+<div id="tip" class="tip" hidden></div>
+</div>
+
+<dialog id="pcSheet" class="pcsheet" aria-labelledby="pcSheetTitle">
+  <div class="pcsheethead">
+    <div><h2 id="pcSheetTitle"></h2><p id="pcSheetSub" class="tblnote"></p></div>
+    <button type="button" id="pcSheetClose" class="pcreset" aria-label="Close">Close</button>
+  </div>
+  <div id="pcSheetBody"></div>
+</dialog>
