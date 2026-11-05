@@ -166,11 +166,11 @@ begin
         'fbs_median_usage', med.fbs_median_usage, 'fbs_median_sr', med.fbs_median_sr, 'fbs_median_epa', med.fbs_median_epa,
         -- where this filtered number would rank against every FBS team's full season
         'sr_rank', case when a.label = 'All Plays' or a.plays < 3 or a.label in ('Explosive Plays','Explosive Pass (15+)','Explosive Run (12+)','Stuffed Run (0 or less)','Sacks','Sack Rate') then null
-                        else 1 + (select count(*) from season s where s.label = a.label and s.sr_rank is not null and
-                                  case when p_side = 'Offense' then s.success_rate > a.sr else s.success_rate < a.sr end) end,
+                        else 1 + (select count(*) from season s where s.label = a.label and s.sr_rank is not null and s.team <> p_team and
+                                  case when p_side = 'Offense' then s.success_rate > round(a.sr, 4) else s.success_rate < round(a.sr, 4) end) end,
         'epa_rank', case when a.label = 'All Plays' or a.plays < 3 then null
-                         else 1 + (select count(*) from season s where s.label = a.label and s.epa_rank is not null and
-                                   case when p_side = 'Offense' then s.epa_per_play > a.epa else s.epa_per_play < a.epa end) end,
+                         else 1 + (select count(*) from season s where s.label = a.label and s.epa_rank is not null and s.team <> p_team and
+                                   case when p_side = 'Offense' then s.epa_per_play > round(a.epa, 4) else s.epa_per_play < round(a.epa, 4) end) end,
         'perf_pool', med.perf_pool, 'teams_in_pool', med.teams_in_pool, 'ord', a.ord) order by
           case a.sec when 'Overview' then 0 when 'Situation' then 1 when 'Passing' then 2 else 3 end, a.ord)
     into v_rows
