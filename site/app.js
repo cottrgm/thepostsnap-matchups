@@ -717,7 +717,7 @@
       var r = h('p', 'exr');
       var neutral = m.dir === 0 || m.dir === 2;
       r.innerHTML = (m.rank ? '<b>#' + m.rank + '</b> of ' + m.pool + (neutral ? (m.dir === 2 ? ' (#1 = fastest)' : ' (#1 = most)') : '') : 'no rank') +
-        ' · FBS ' + exFmt(k, m.nat) + (m.n ? ' · ' + m.n + ' plays' : '');
+        ' · FBS ' + exFmt(k, m.nat) + (m.n && m.grp !== 'special' && m.grp !== 'tempo' ? ' · ' + m.n + (m.grp === 'drives' ? ' drives' : m.grp === 'fourth' ? ' 4th downs' : m.grp === 'recv' ? ' catches' : ' plays') : '');
       c.appendChild(r);
       if (m.rank && m.pool > 1 && !neutral) c.style.boxShadow = 'inset 4px 0 0 ' + shade(1 - (m.rank - 1) / (m.pool - 1));
       grid.appendChild(c);
