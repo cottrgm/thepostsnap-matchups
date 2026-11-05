@@ -135,14 +135,16 @@ footer{color:var(--muted);font-size:12px;display:flex;flex-direction:column;gap:
 body{margin:0;padding-top:0}
 .pshead{margin-left:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1 * max(16px,env(safe-area-inset-right,0px)));margin-bottom:18px;position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel)}
 .pshead a{color:var(--ink);text-decoration:none}
-.pshead .home{font-family:var(--display);font-weight:900;font-size:22px;letter-spacing:.02em;text-transform:uppercase}
-.pshead .home span{color:var(--a)}
+:root{--pslogo:url("__PS_LOGO__")}
+.pshead .wordmark{display:block;width:148px;height:41px;flex:none;background:var(--ink);-webkit-mask:var(--pslogo) left center/contain no-repeat;mask:var(--pslogo) left center/contain no-repeat}
+.pshead .wm{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media (max-width:680px){.pshead .wordmark{width:124px;height:34px}}
 .pshead .back{font-family:var(--body);font-weight:600;font-size:13px;color:var(--muted)}
 .pshead .back:hover{color:var(--a)}
 .psload{padding:40px 16px;text-align:center;color:var(--muted);font-family:var(--body)}
 </style>
 </head><body>
-<header class="pshead"><a class="home" href="/">The <span>Post-Snap</span></a><a class="back" href="/">&#8592; Team stats</a></header>
+<header class="pshead"><a class="wordmark" href="/" aria-label="The Post-Snap home"><span class="wm">The Post-Snap</span></a><a class="back" href="/">&#8592; Team stats</a></header>
 <div class="psload" id="psload">Loading every FBS roster&hellip;</div>
 
 <div class="wrap">
