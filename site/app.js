@@ -510,8 +510,8 @@
         svg.appendChild(el('line', { x1: fx(0), x2: fx(FW), y1: y, y2: y, stroke: line, 'stroke-width': yd % 10 === 0 ? 2 : 1.2 }));
         if (yd % 10 === 0 && yd !== 0) {
           var lab = (yd > 0 ? '+' : '') + yd;
-          svg.appendChild(el('text', { x: fx(5), y: y + 6, class: 'fdnum', 'text-anchor': 'middle' }, lab));
-          svg.appendChild(el('text', { x: fx(FW - 5), y: y + 6, class: 'fdnum', 'text-anchor': 'middle' }, lab));
+          svg.appendChild(el('text', { x: fx(9), y: y - 5, class: 'fdnum', 'text-anchor': 'middle' }, lab));
+          svg.appendChild(el('text', { x: fx(FW - 9), y: y - 5, class: 'fdnum', 'text-anchor': 'middle' }, lab));
         }
       } else {
         [0.6, HASH_L, HASH_R, FW - 0.6].forEach(function (hx) {
@@ -521,7 +521,7 @@
     }
     /* line of scrimmage */
     svg.appendChild(el('line', { x1: fx(0), x2: fx(FW), y1: fy(0), y2: fy(0), stroke: d ? '#7aa2ff' : '#1f4fbf', 'stroke-width': 4 }));
-    svg.appendChild(el('text', { x: fx(FW / 2), y: fy(0) + 22, class: 'fdlos', 'text-anchor': 'middle' }, 'LINE OF SCRIMMAGE'));
+    svg.appendChild(el('text', { x: fx(FW) + 14, y: fy(0) + 4, class: 'fdlos', 'text-anchor': 'middle', transform: 'rotate(-90 ' + (fx(FW) + 14) + ' ' + (fy(0) + 4) + ')' }, 'LOS'));
     svg.appendChild(el('text', { x: fx(FW / 2), y: FTOP - 18, class: 'fdlos', 'text-anchor': 'middle' }, side === 'Offense' ? 'OFFENSE MOVES THIS WAY ↑' : 'OPPONENT OFFENSE MOVES THIS WAY ↑'));
 
     /* zones */
@@ -533,7 +533,7 @@
       var fill, op;
       if (!z) { fill = 'transparent'; op = 0; }
       else if (metric === 'share') { fill = d ? '#7aa2ff' : '#1f4fbf'; op = 0.08 + 0.55 * (z.share / (maxShare || 1)); }
-      else { var rk = z['rk_' + metric]; var p = rk && z.pool > 1 ? 1 - (rk - 1) / (z.pool - 1) : null; fill = shade(p); op = p === null ? 0.15 : 0.78; }
+      else { var rk = z['rk_' + metric]; var p = rk && z.pool > 1 ? 1 - (rk - 1) / (z.pool - 1) : null; fill = shade(p); op = p === null ? 0.12 : 0.55; }
       var r = el('rect', { x: fx(lane[0]) + 2, y: y0 + 2, width: (lane[1] - lane[0]) * K - 4, height: y1 - y0 - 4, rx: 4, fill: fill, 'fill-opacity': op,
         stroke: state.fdSel === k ? (d ? '#fff' : '#151b26') : 'rgba(255,255,255,.35)', 'stroke-width': state.fdSel === k ? 3 : 1, class: 'fdzone' });
       r.addEventListener('click', function () { state.fdSel = state.fdSel === k ? null : k; drawFieldLive(); });
@@ -573,7 +573,7 @@
       var g = el('g', { class: 'fdlab' });
       g.appendChild(el('rect', { x: cx - 44, y: cy - 24, width: 88, height: 40, rx: 5, class: 'fdlabbg' }));
       g.appendChild(el('text', { x: cx, y: cy - 5, 'text-anchor': 'middle', class: 'fdlabv' }, v));
-      g.appendChild(el('text', { x: cx, y: cy + 11, 'text-anchor': 'middle', class: 'fdlabr' }, (rk ? '#' + rk + ' FBS' : '') + ' · ' + z.n));
+      g.appendChild(el('text', { x: cx, y: cy + 11, 'text-anchor': 'middle', class: 'fdlabr' }, (rk ? '#' + rk + ' FBS' : '') + ' · ' + z.n + (runs ? ' runs' : ' tgts')));
       g.addEventListener('click', function () { state.fdSel = state.fdSel === k ? null : k; drawFieldLive(); });
       svg.appendChild(g);
     });
