@@ -160,7 +160,7 @@ body{margin:0;padding-top:0}
     <div class="row">
       <div class="pick"><span class="lbl">Season</span><div class="seg" id="yr" role="group" aria-label="Season"><button type="button" data-v="2026">2026 now</button><button type="button" data-v="2027">2027 projected</button></div></div>
       <div class="pick"><span class="lbl">Where</span><div class="seg" id="site" role="group" aria-label="Site"><button type="button" data-v="A">A home</button><button type="button" data-v="N">Neutral</button><button type="button" data-v="B">B home</button></div></div>
-      <div class="pick"><span class="lbl">Players</span><div class="seg" id="tier" role="group" aria-label="Tier"><button type="button" data-v="11">Top 11</button><button type="button" data-v="22">Top 22</button><button type="button" data-v="32">Top 32</button><button type="button" data-v="33">Top 33</button></div></div>
+      <div class="pick"><span class="lbl">Players</span><div class="seg" id="tier" role="group" aria-label="Tier"><button type="button" data-v="11">Top 11</button><button type="button" data-v="22">Top 22</button><button type="button" data-v="33">Top 33</button></div></div>
       <label class="pick"><span class="lbl">Service</span><select id="svc" class="small-sel"></select></label>
       <div class="pick"><span class="lbl">Unrated players</span><div class="seg" id="unr" role="group" aria-label="Unrated"><button type="button" data-v="floor">At 2-star floor</button><button type="button" data-v="excl">Excluded</button></div></div>
     </div>
@@ -300,6 +300,10 @@ const P = D.players.map(r => ({team:r[0], side:r[1], rank:r[2], pos:r[3], name:r
 const byTeam = {}; P.forEach(p => (byTeam[p.team] ??= []).push(p));
 const S = {schTeam:'A', clsScope:'conf', clsSort:'d', yr:2026, A:'Auburn', B:'Alabama', site:'N', tier:22, svc:'ALL', unr:'floor', tblSide:'O', rosTeam:'A'};
 try { Object.assign(S, JSON.parse(localStorage.getItem('fbsMatchup') || '{}')); } catch(e) {}
+// saved settings from older versions: only 11/22/33 exist now, and teams must still be on the board
+if (![11, 22, 33].includes(Number(S.tier))) S.tier = 22;
+if (!D.teams[S.A]) S.A = 'Auburn'; if (!D.teams[S.B]) S.B = 'Alabama';
+if (!['d','avg','cur','nr','team'].includes(S.clsSort)) S.clsSort = 'd';
 let saved = false; try { saved = !!localStorage.getItem('fbsMatchup'); } catch(e) {}
 if (!D.teams[S.A]) S.A = 'Auburn'; if (!D.teams[S.B]) S.B = 'Alabama';
 if (!saved){ const nx = D.schedule.filter(g => g[2] === 'Auburn' || g[3] === 'Auburn').sort((a,b) => a[0]-b[0])[0]; if (nx){ S.A = 'Auburn'; S.B = nx[2] === 'Auburn' ? nx[3] : nx[2]; S.site = nx[4] ? 'N' : (nx[2] === 'Auburn' ? 'A' : 'B'); } }
@@ -582,21 +586,21 @@ function schedule(){
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-opp]'); if (!b) return; const team = S.schTeam === 'A' ? S.A : S.B; S.A = team; S.B = b.dataset.opp; S.site = siteFromSchedule() ?? 'N'; render(); window.scrollTo({top: 0, behavior: 'smooth'}); });
 
-// ---------- 2027 class impact: incoming class vs current top 32 ----------
+// ---------- 2027 class impact: incoming class vs current top 33 ----------
 function classImpact(){
   const svcIdx = S.svc === 'ALL' ? -1 : SV.indexOf(S.svc);
   const score = p => svcIdx < 0 ? p.all : (p.s[svcIdx][2] === 'U' ? null : p.s[svcIdx][0]);
   const rows = TEAMS.map(team => {
     const cls = (byTeam[team] || []).filter(p => p.st === 'C'), vals = cls.map(score).filter(v => v != null);
     const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-    const o = talentVal(team, 'O', 32, S.svc, 'excl'), d = talentVal(team, 'D', 32, S.svc, 'excl');
+    const o = talentVal(team, 'O', 33, S.svc, 'excl'), d = talentVal(team, 'D', 33, S.svc, 'excl');
     const cur = o != null && d != null ? (o + d) / 2 : null;
     return {team, conf: D.teams[team].conf, n: cls.length, nr: vals.length, avg, cur, d: avg != null && cur != null ? avg - cur : null};
   }).filter(r => r.avg != null && r.cur != null);
   const rankBy = (key) => { for (const r of rows) r[key + 'Rk'] = 1 + rows.filter(x => x[key] > r[key]).length; };
   rankBy('avg'); rankBy('d'); rankBy('cur');
   // the sortable metrics; '#' always shows the national rank on whichever metric the table is sorted by
-  const cols = {d: [-1, 'Impact', 'dRk'], avg: [-1, 'Class avg', 'avgRk'], cur: [-1, 'Current top 32', 'curRk'], nr: [-1, 'Rated commits', null], team: [1, 'Team', null]};
+  const cols = {d: [-1, 'Impact', 'dRk'], avg: [-1, 'Class avg', 'avgRk'], cur: [-1, 'Current top 33', 'curRk'], nr: [-1, 'Rated commits', null], team: [1, 'Team', null]};
   if (!cols[S.clsSort]) S.clsSort = 'd';
   const dir = S.clsSortDir ?? cols[S.clsSort][0];
   const val = r => S.clsSort === 'team' ? r.team : r[S.clsSort];
@@ -610,7 +614,7 @@ function classImpact(){
   const rk = n => `<span class="note">#${n}</span>`;
   $('classes').innerHTML = `<table><tr><th style="text-align:left" title="National rank on the sorted column">#</th>${th('team', 1)}${th('d')}${th('avg')}${th('cur')}${th('nr')}</tr>${show.map(r => `<tr style="${r.team === S.A ? 'background:var(--a-soft)' : r.team === S.B ? 'background:var(--b-soft)' : ''}"><td style="text-align:left;font-family:var(--mono)">${r[rkKey]}</td><td style="text-align:left;font-family:var(--body)">${esc(r.team)} <span class="note">${esc(r.conf)}</span></td><td><span class="dl ${r.d > 0 ? 'up' : 'dn'}" style="font-size:13px">${sgn(r.d, dp)}</span> ${rk(r.dRk)}</td><td>${fmt(r.avg, dp)} ${rk(r.avgRk)}</td><td>${fmt(r.cur, dp)} ${rk(r.curRk)}</td><td><button class="tap" type="button" data-k="class|${esc(r.team)}">${r.nr}</button>${r.n > r.nr ? `<span class="note"> of ${r.n}</span>` : ''}</td></tr>`).join('')}</table>`;
   const unit = S.svc === 'ALL' ? 'All Services percentile (0-100, each service\'s rating converted to a percentile of its high-school pool, then averaged)' : `${S.svc} rating`;
-  $('clsNote').innerHTML = `<b>Impact</b> = class avg minus current top 32; positive means the incoming class is better than the players it joins. <b>Class avg</b> = average ${unit} of the school's rated 2027 commits. <b>Current top 32</b> = average of the 32 most-snapped available players on offense and on defense this season, same scale, unrated excluded. <b>Rated commits</b> = committed 2027 signees this service rates (tap to see them; "of N" = all commits). Small <b>#</b> = national rank on that column among ${rows.length} FBS teams; the first column is the rank on whichever column is sorted. Tap a column heading to sort. Classes are not final until signing day.`;
+  $('clsNote').innerHTML = `<b>Impact</b> = class avg minus current top 33; positive means the incoming class is better than the players it joins. <b>Class avg</b> = average ${unit} of the school's rated 2027 commits. <b>Current top 33</b> = average of the 33 most-snapped available players on offense and on defense this season, same scale, unrated excluded. <b>Rated commits</b> = committed 2027 signees this service rates (tap to see them; "of N" = all commits). Small <b>#</b> = national rank on that column among ${rows.length} FBS teams; the first column is the rank on whichever column is sorted. Tap a column heading to sort. Classes are not final until signing day.`;
 }
 document.addEventListener('click', e => { const h = e.target.closest('[data-cls-sort]'); if (!h) return; const k = h.dataset.clsSort;
   if (S.clsSort === k) S.clsSortDir = -(S.clsSortDir ?? (k === 'team' ? 1 : -1)); else { S.clsSort = k; S.clsSortDir = undefined; }
@@ -655,7 +659,7 @@ $('sheet').addEventListener('click', e => { if (e.target === $('sheet')) $('shee
 
 const last = new Date(D.last_played);
 $('asof').textContent = `2026 depth charts and recruiting ratings for all ${TEAMS.length} FBS teams · results through ${last.toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'America/Chicago'})}`;
-$('foot').innerHTML = `<span>Players ranked by PFF season-to-date snaps on each side of the ball: the 11, 22, 32 and 33 most-snapped players. Refreshed weekly from PFF.</span><span>Original high-school ratings from 247Sports, 247 Composite (via CollegeFootballData), On3, On3 Industry, ESPN and Rivals. Portal-only ratings count at a ${Math.round(D.discount*100)}% discount above each service's 2-star floor.</span><span>Results, SP+, FPI and Elo from CollegeFootballData. Market lines are the median across books.</span>`;
+$('foot').innerHTML = `<span>Players ranked by PFF season-to-date snaps on each side of the ball: the 11, 22 and 33 most-snapped players. Refreshed weekly from PFF.</span><span>Original high-school ratings from 247Sports, 247 Composite (via CollegeFootballData), On3, On3 Industry, ESPN and Rivals. Portal-only ratings count at a ${Math.round(D.discount*100)}% discount above each service's 2-star floor.</span><span>Results, SP+, FPI and Elo from CollegeFootballData. Market lines are the median across books.</span>`;
 render();
 document.getElementById('psload').hidden = true;
 })().catch(e => { document.getElementById('psload').textContent = 'The matchup data did not load. Refresh to try again.'; console.error(e); });
