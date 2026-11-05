@@ -206,7 +206,7 @@
       host.appendChild(reset);
     }
   }
-  function refreshPC() { buildPCChart(); buildTend(); buildFieldLive(); }
+  function refreshPC() { buildPCChart(); buildTend(); buildFieldLive(); buildExtras(); buildExtras(); }
 
   function buildPCChart() {
     var host = document.getElementById('pcChart');
@@ -686,6 +686,179 @@
     body.appendChild(h('p', 'tblnote', list.length + ' plays. ' + (side === 'Defense' ? 'Blue edge = the defense won the play; red = the offense did.' : 'Blue edge = successful play; red = unsuccessful.')));
     var w = h('div', 'tablewrap tall'); w.appendChild(t); body.appendChild(w);
     if (dlg.showModal) { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute('open', '');
+  }
+
+  /* ---- deeper numbers: receivers, pressure, defenders, drives, 3rd/4th down, tempo, special teams ----
+     Every team number carries its national rank among FBS teams; with a filter on, the rank is
+     where that number would place against every team's full season. */
+  state.exTab = state.exTab || 0; state.exSide = state.exSide || 0;
+  var EX_TABS = [
+    ['recv', 'Receivers & YAC'], ['pressure', 'Pressure & QB'], ['def', 'Defenders'], ['drives', 'Drives & tempo'],
+    ['downs', '3rd & 4th down'], ['special', 'Special teams']
+  ];
+  function exFmt(k, v) {
+    if (v === null || v === undefined || isNaN(v)) return '–';
+    if (/rate|pct|fg40|three_out|rz_td|third|fourth_go|fourth_conv/.test(k)) return pct(v, 1);
+    if (k === 'fourth_aggr') return (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + ' pts';
+    if (/^epa/.test(k)) return sgn(v);
+    if (k === 'start_pos' || k === 'ko_start') return 'Own ' + Math.round(v);
+    if (k === 'sec_per_snap') return num(v, 1) + ' s';
+    if (k === 'net_punt') return num(v, 1) + ' yds';
+    if (k === 'yac_per_catch') return num(v, 1) + ' yds';
+    return num(v, 2);
+  }
+  function exCards(host, M, keys, side) {
+    var grid = h('div', 'excards');
+    keys.forEach(function (k) {
+      var m = M[k]; if (!m) return;
+      var c = h('div', 'excard');
+      c.appendChild(h('p', 'exl', m.label));
+      c.appendChild(h('p', 'exv', exFmt(k, m.v)));
+      var r = h('p', 'exr');
+      var neutral = m.dir === 0 || m.dir === 2;
+      r.innerHTML = (m.rank ? '<b>#' + m.rank + '</b> of ' + m.pool + (neutral ? (m.dir === 2 ? ' (#1 = fastest)' : ' (#1 = most)') : '') : 'no rank') +
+        ' · FBS ' + exFmt(k, m.nat) + (m.n ? ' · ' + m.n + ' plays' : '');
+      c.appendChild(r);
+      if (m.rank && m.pool > 1 && !neutral) c.style.boxShadow = 'inset 4px 0 0 ' + shade(1 - (m.rank - 1) / (m.pool - 1));
+      grid.appendChild(c);
+    });
+    host.appendChild(grid);
+  }
+  function exTable(host, cols, rows, opts) {
+    opts = opts || {};
+    var key = 'exSort_' + (opts.id || ''), st = state[key] || { k: opts.sort || null, asc: false };
+    if (st.k) rows = rows.slice().sort(function (a, b) {
+      var x = a[st.k], y = b[st.k]; if (typeof x === 'string') return (st.asc ? 1 : -1) * String(x).localeCompare(String(y));
+      if (x == null) return 1; if (y == null) return -1; return (st.asc ? 1 : -1) * (x - y);
+    });
+    var t = h('table', 'extab sortable'), tr = h('tr');
+    cols.forEach(function (c) {
+      var th = h('th', st.k === c[0] ? 'sorted' + (st.asc ? ' asc' : '') : null, c[1]);
+      if (c[3] !== false) th.onclick = function () { state[key] = { k: c[0], asc: st.k === c[0] ? !st.asc : typeof rows[0] === 'object' && typeof (rows[0] || {})[c[0]] === 'string' }; opts.redraw(); };
+      if (c[4]) th.title = c[4];
+      tr.appendChild(th);
+    });
+    var th0 = h('thead'); th0.appendChild(tr); t.appendChild(th0);
+    var tb = h('tbody');
+    rows.slice(0, opts.limit || 500).forEach(function (r) {
+      var row = h('tr');
+      cols.forEach(function (c, i) { row.appendChild(h('td', i === 0 ? 'pclab' : null, c[2](r))); });
+      tb.appendChild(row);
+    });
+    t.appendChild(tb);
+    var w = h('div', 'tablewrap' + (opts.tall ? ' tall' : '')); w.appendChild(t); host.appendChild(w);
+  }
+
+  function buildExtras() {
+    var host = document.getElementById('exChart');
+    if (!host) return;
+    var side = ['Offense', 'Defense'][state.exSide] || 'Offense';
+    segs(document.getElementById('exSideTabs'), ['Their offense', 'Their defense'], state.exSide, function (i) { state.exSide = i; buildExtras(); });
+    segs(document.getElementById('exTabs'), EX_TABS.map(function (x) { return x[1]; }), state.exTab, function (i) { state.exTab = i; drawExtras(); });
+    var seq = state.exSeq = (state.exSeq || 0) + 1;
+    if (!host.firstChild) host.appendChild(h('p', 'ax', 'Loading…'));
+    host.style.opacity = '.55';
+    Promise.all([
+      fetch('api/extras?' + pcQuery(side)).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('api/pc?' + pcQuery(side)).then(function (r) { return r.ok ? r.json() : { games: [] }; })
+    ]).then(function (res) {
+      if (seq !== state.exSeq) return; host.style.opacity = '';
+      pcFilters(document.getElementById('exFilters'), res[1].games, refreshPC);
+      state.exData = res[0]; state.exData.sideName = side;
+      drawExtras();
+    }).catch(function (e) { if (seq !== state.exSeq) return; host.style.opacity = ''; host.innerHTML = ''; host.appendChild(h('p', 'ax', 'Could not load these numbers. ' + e.message)); });
+  }
+
+  function drawExtras() {
+    var host = document.getElementById('exChart'), j = state.exData;
+    if (!host || !j) return;
+    segs(document.getElementById('exTabs'), EX_TABS.map(function (x) { return x[1]; }), state.exTab, function (i) { state.exTab = i; drawExtras(); });
+    var tab = EX_TABS[state.exTab][0], side = j.sideName, M = j.metrics || {}, off = side === 'Offense';
+    var us = state.team, them = off ? 'opponents' : state.team;
+    host.innerHTML = '';
+    var note = '';
+    if (tab === 'recv') {
+      exCards(host, M, ['yac_per_catch']);
+      host.appendChild(h('h3', 'exh', off ? state.team + ' receivers' : 'Receivers against ' + state.team));
+      var tot = (j.receivers || []).reduce(function (s, r) { return s + r.tg; }, 0);
+      exTable(host, [
+        ['who', 'Receiver', function (r) { return r.who; }],
+        ['tg', 'Targets', function (r) { return r.tg + ' (' + pct(r.tg / (tot || 1)) + ')'; }, true, 'Targets, and share of the team\'s targets'],
+        ['rec', 'Catches', function (r) { return r.rec + ' (' + pct(r.rec / r.tg) + ')'; }],
+        ['yds', 'Yards', function (r) { return r.yds == null ? 0 : r.yds; }],
+        ['ypt', 'Yds/target', function (r) { return num((r.yds || 0) / r.tg, 1); }],
+        ['yacpc', 'YAC/catch', function (r) { return r.yac_n ? num(r.yac / r.yac_n, 1) : '–'; }, true, 'Yards after the catch: yards gained beyond the catch spot'],
+        ['adot', 'Avg depth', function (r) { return r.adot == null ? '–' : num(r.adot, 1); }, true, 'Average target depth past the line of scrimmage'],
+        ['epa', 'EPA/target', function (r) { return sgn(r.epa); }],
+        ['td', 'TD', function (r) { return r.td; }]
+      ], (j.receivers || []).map(function (r) { r.ypt = (r.yds || 0) / r.tg; r.yacpc = r.yac_n ? r.yac / r.yac_n : null; return r; }), { id: 'recv', sort: 'tg', redraw: drawExtras });
+      note = 'Targets come from the play-by-play ("pass ... to"). Yards after catch = yards gained minus the catch spot\'s distance past the line; catches with no recorded spot are left out of YAC and depth.';
+    } else if (tab === 'pressure') {
+      exCards(host, M, ['pressure_rate', 'sack_rate', 'epa_clean', 'epa_pressured']);
+      host.appendChild(h('h3', 'exh', off ? state.team + ' quarterbacks' : 'Quarterbacks against ' + state.team));
+      exTable(host, [
+        ['who', 'Passer', function (r) { return r.who; }],
+        ['n', 'Dropbacks', function (r) { return r.n; }],
+        ['pr', 'Pressured', function (r) { return pct(r.pr, 1); }, true, 'Hurried or sacked, per dropback'],
+        ['sacks', 'Sacks', function (r) { return r.sacks; }],
+        ['epa_clean', 'EPA clean', function (r) { return sgn(r.epa_clean); }],
+        ['epa_pr', 'EPA pressured', function (r) { return sgn(r.epa_pr); }]
+      ], j.passers || [], { id: 'qb', sort: 'n', redraw: drawExtras });
+      note = 'Pressure = a sack or a play where the play-by-play says the quarterback was hurried. Scorers do not log every hurry, so pressure rates read low across the board; the ranks compare like with like.';
+    } else if (tab === 'def') {
+      exCards(host, M, ['pbu_rate', 'int_rate', 'tfl_rate', 'opp_rate', 'pressure_rate', 'sack_rate']);
+      host.appendChild(h('h3', 'exh', off ? 'Defenders who made plays against ' + state.team : state.team + ' defenders'));
+      exTable(host, [
+        ['who', 'Defender', function (r) { return r.who; }],
+        ['tk', 'Tackles', function (r) { return r.tk; }, true, 'Every defender named on the tackle, so shared tackles count for each'],
+        ['tfl', 'TFL (runs)', function (r) { return r.tfl; }],
+        ['sk', 'Sacks', function (r) { return r.sk; }],
+        ['hur', 'Hurries', function (r) { return r.hur; }],
+        ['pbu', 'PBU', function (r) { return r.pbu; }, true, 'Passes broken up'],
+        ['int', 'INT', function (r) { return r.int; }]
+      ], j.defenders || [], { id: 'def', sort: 'tk', redraw: drawExtras, tall: true });
+      note = (off ? 'Rates are what defenses did against ' + state.team + '; lower is better for the offense. ' : '') +
+        'Names come from the play-by-play: the tacklers in parentheses, "hurried by", "broken up by", "intercepted by". TFL counts runs stopped behind the line; sacks are separate.';
+    } else if (tab === 'drives') {
+      exCards(host, M, ['ppd', 'start_pos', 'three_out', 'rz_td', 'to_rate', 'sec_per_snap']);
+      host.appendChild(h('h3', 'exh', off ? state.team + ' drives' : 'Opponent drives against ' + state.team));
+      exTable(host, [
+        ['week', 'Wk', function (r) { return r.week; }],
+        ['opp', 'Opponent', function (r) { return r.opp; }],
+        ['q', 'Q', function (r) { return r.q > 4 ? 'OT' : r.q; }],
+        ['start', 'Start', function (r) { return r.start == null ? '–' : (r.start > 50 ? 'Opp ' + (100 - r.start) : 'Own ' + r.start); }],
+        ['plays', 'Plays', function (r) { return r.plays; }],
+        ['yds', 'Yards', function (r) { return r.yds; }],
+        ['result', 'Result', function (r) { return r.result; }],
+        ['pts', 'Pts', function (r) { return r.pts; }]
+      ], j.drives || [], { id: 'drv', redraw: drawExtras, tall: true });
+      note = 'A drive is every snap in a row by one offense, starting after a kickoff, punt, turnover or the start of a half. Points count a touchdown as 7 and a field goal as 3. Tempo = game-clock seconds between snaps within a drive; the clock stops on incompletions and out-of-bounds plays, so compare teams, not raw seconds.';
+    } else if (tab === 'downs') {
+      exCards(host, M, ['third_conv', 'third_s', 'third_m', 'third_l', 'third_xl', 'fourth_go', 'fourth_aggr', 'fourth_conv']);
+      host.appendChild(h('h3', 'exh', '4th-down decisions by situation'));
+      var BL = { '1': '4th & 1', '2-3': '4th & 2-3', '4-6': '4th & 4-6', '7+': '4th & 7+' }, FLD = { own: 'own territory', mid: 'midfield (opp 41 to own 40)', fringe: 'opp 26-40', fg: 'opp 25 and in' };
+      exTable(host, [
+        ['b', 'Situation', function (r) { var p = r.b.split('|'); return BL[p[0]] + ', ' + FLD[p[1]]; }],
+        ['n', '4th downs', function (r) { return r.n; }],
+        ['go', 'Went for it', function (r) { return pct(r.go); }],
+        ['nat', 'FBS went for it', function (r) { return pct(r.nat); }],
+        ['conv', 'Converted', function (r) { return r.conv == null ? '–' : pct(r.conv); }]
+      ], (j.fourth || []).map(function (r) { r.diff = r.go - (r.nat || 0); return r; }), { id: 'fourth', redraw: drawExtras });
+      note = 'Conversion = gained the yards needed on that down. Aggressiveness compares how often they went for it with how often FBS teams went for it in the same distance and field position, so a team that faces lots of 4th-and-1 is not credited for it. It is a measure of tendency, not of whether each call was right.';
+    } else if (tab === 'special') {
+      exCards(host, M, ['net_punt', 'fg_pct', 'fg40', 'ko_start']);
+      host.appendChild(h('h3', 'exh', off ? state.team + ' field goals by distance' : 'Opponent field goals against ' + state.team));
+      exTable(host, [
+        ['b', 'Distance', function (r) { return r.b; }, false],
+        ['att', 'Attempts', function (r) { return r.att; }],
+        ['made', 'Made', function (r) { return r.made; }],
+        ['pct', 'Pct', function (r) { return pct(r.made / r.att); }]
+      ], (j.fg || []).map(function (r) { r.pct = r.made / r.att; return r; }), { id: 'fg', redraw: drawExtras });
+      note = off ? 'Their units: net punt = punt distance minus return yards (touchbacks cost 20). Kickoff start = where their offense starts after receiving a kickoff.'
+                 : 'What opponents did against them: opponents\' net punting, field goals, and where opponents start after ' + state.team + ' kicks off (lower is better for ' + state.team + ').';
+    }
+    document.getElementById('exNote').innerHTML = (pcFilterText() ? '<b>Filtered:</b> ' + pcFilterText() + '. Ranks show where these numbers would place against every FBS team\'s full season. ' : '') +
+      'The colored edge on each number is its national rank (blue = better' + (off ? '' : ' for the defense') + ', red = worse). ' + note;
   }
 
   /* ---- collapsible panels ----
