@@ -255,6 +255,7 @@
       var k = state.pcSort, dir = state.pcAsc ? 1 : -1;
       rows.sort(function (a, b) {
         var x = a[k], y = b[k];
+        if (k === 'success_rate') { if (PC_NO_SR[a.label]) x = null; if (PC_NO_SR[b.label]) y = null; }
         if (k === 'label') return dir * String(x).localeCompare(String(y));
         if (x == null) return 1; if (y == null) return -1;
         return dir * (x - y);
@@ -405,7 +406,7 @@
   }
 
   /* ---- the plays behind any row or cell ---- */
-  function ydLine(ytg) { if (ytg == null) return ''; if (ytg === 50) return '50'; return ytg > 50 ? 'Own ' + (100 - ytg) : 'Opp ' + ytg; }
+  function ydLine(ytg, def) { if (ytg == null) return ''; if (ytg === 50) return '50'; var own = ytg > 50; if (def) own = !own; return (own ? 'Own ' : 'Opp ') + (ytg > 50 ? 100 - ytg : ytg); }
   function clk(s) { if (s == null) return ''; var m = Math.floor(s / 60), x = s % 60; return m + ':' + (x < 10 ? '0' : '') + x; }
   function ord(n) { return ['', '1st', '2nd', '3rd', '4th'][n] || n + 'th'; }
   function openPlays(side, sel, title) {
@@ -423,14 +424,14 @@
         body.innerHTML = '';
         var good = list.filter(function (p) { return p.success; }).length;
         body.appendChild(h('p', 'tblnote', j.n + ' plays' + (j.n > list.length ? ' (showing the first ' + list.length + ')' : '') +
-          ' · ' + (list.length ? Math.round(100 * good / list.length) : 0) + '% successful' + (side === 'Defense' ? ' for the offense' : '') + '.'));
+          ' · ' + (list.length ? Math.round(100 * good / list.length) : 0) + '% successful' + (side === 'Defense' ? ' for the offense' : '') + '. ' + (side === 'Defense' ? 'Blue edge = the defense won the play; red = the offense did. Ball on is from ' + state.team + '\'s side of the field.' : 'Blue edge = successful play; red = unsuccessful.')));
         var t = h('table', 'pltab'), hr = h('tr');
         ['Wk', 'Opponent', 'Q', 'Clock', 'Down', 'Ball on', 'Score', 'Yds', 'EPA', 'Play'].forEach(function (x) { hr.appendChild(h('th', null, x)); });
         var th = h('thead'); th.appendChild(hr); t.appendChild(th);
         var tb = h('tbody');
         list.forEach(function (p) {
-          var r = h('tr', p.success ? 'ok' : 'no');
-          [p.week, p.opponent, p.q > 4 ? 'OT' : p.q, clk(p.clock), p.down ? ord(p.down) + ' & ' + p.dist : '', ydLine(p.ytg), p.score, p.yds, sgn(p.epa)].forEach(function (v, i) {
+          var r = h('tr', (side === 'Defense' ? !p.success : p.success) ? 'ok' : 'no');
+          [p.week, p.opponent, p.q > 4 ? 'OT' : p.q, clk(p.clock), p.down ? ord(p.down) + ' & ' + p.dist : '', ydLine(p.ytg, side === 'Defense'), p.score, p.yds, sgn(p.epa)].forEach(function (v, i) {
             r.appendChild(h('td', i === 1 ? 'tm' : null, v == null ? '' : String(v)));
           });
           var tx = h('td', 'pltext', p.text || p.type || ''); if (p.garbage) tx.appendChild(h('span', 'gb', ' garbage time'));
