@@ -206,7 +206,7 @@
       host.appendChild(reset);
     }
   }
-  function refreshPC() { buildPCChart(); buildTend(); buildFieldLive(); buildExtras(); buildExtras(); }
+  function refreshPC() { buildPCChart(); buildTend(); buildFieldLive(); buildExtras(); }
 
   function buildPCChart() {
     var host = document.getElementById('pcChart');
@@ -2817,7 +2817,7 @@
     window.__psSeason = state.season;
     buildHero(); buildRatings(); buildMarket(); buildRank(); buildAdjusted();
     buildField(); buildSit(); buildTrend(); buildPlayers(); buildLimits();
-    buildFresh(); buildH2H(); buildConf(); buildBoard(); buildPCChart(); buildTend(); buildFieldLive();
+    buildFresh(); buildH2H(); buildConf(); buildBoard(); buildPCChart(); buildTend(); buildFieldLive(); buildExtras();
     document.getElementById('loading').hidden = true;
     document.getElementById('content').hidden = false;
     wireCollapse();
