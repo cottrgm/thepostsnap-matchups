@@ -2590,6 +2590,14 @@ window.TEAM_LOGOS = {"Air Force":2005,"Akron":2006,"Alabama":333,"App State":202
     for (var i = 0; i < all.length; i++) decorate(all[i]);
   }
   window.__tlRescan = function () { scan(document.body); };
+  /* the poll ranks only apply to the current season: rescan whenever the page's season is set */
+  var psSeason = window.__psSeason, rescanQueued = false;
+  try {
+    Object.defineProperty(window, '__psSeason', { configurable: true,
+      get: function () { return psSeason; },
+      set: function (v) { var changed = v !== psSeason; psSeason = v;
+        if (changed && !rescanQueued) { rescanQueued = true; setTimeout(function () { rescanQueued = false; scan(document.body); }, 0); } } });
+  } catch (e) { /* older browsers: ranks still appear on the next render */ }
   var pending = [], queued = false;
   function flush() {
     queued = false;
