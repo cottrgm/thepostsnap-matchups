@@ -106,6 +106,7 @@ dialog::backdrop{background:rgba(10,14,22,.5)}
 .sheet .body{overflow:auto;padding:4px 16px 16px}
 .x{font:600 14px var(--body);background:var(--soft);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer}
 .pl td{white-space:normal}
+.badge.bo{background:var(--b-soft);color:var(--b);border-color:var(--b)}
 .badge{font:600 10px var(--body);border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:1px}
 .bt{background:color-mix(in srgb,var(--gold) 20%,transparent);color:var(--gold)}
 .bf{background:var(--soft);color:var(--muted)}
@@ -173,6 +174,7 @@ body{margin:0;padding-top:0}
     </div>
     <div class="bar" aria-hidden="true"><i id="barA"></i></div>
     <div class="math" id="math"></div>
+    <p class="note" id="outNote" style="margin:0"></p>
     <p class="note" id="modelNote" style="margin:0"></p>
   </section>
 
@@ -226,7 +228,7 @@ body{margin:0;padding-top:0}
 const inline = document.getElementById('data');
 const D = inline && inline.textContent.trim().startsWith('{') ? JSON.parse(inline.textContent) : await (await fetch('/api/matchups-data')).json();
 const SV = D.services, TEAMS = Object.keys(D.teams).sort();
-const P = D.players.map(r => ({team:r[0], side:r[1], rank:r[2], pos:r[3], name:r[4], cls:r[5], st:r[6], fill:r[7], hs:r[8], grp:r[9], s:r[10], all:r[11], from:r[12], r27:r[13], leave:r[14], snaps:r[15], games:r[16]}));
+const P = D.players.map(r => ({team:r[0], side:r[1], rank:r[2], pos:r[3], name:r[4], cls:r[5], st:r[6], fill:r[7], hs:r[8], grp:r[9], s:r[10], all:r[11], from:r[12], r27:r[13], leave:r[14], snaps:r[15], games:r[16], out:r[17], outWhy:r[18], orank:r[19], outKind:r[20], outSrc:r[21]}));
 const byTeam = {}; P.forEach(p => (byTeam[p.team] ??= []).push(p));
 const S = {schTeam:'A', clsScope:'conf', yr:2026, A:'Auburn', B:'Alabama', site:'N', tier:22, svc:'ALL', unr:'floor', tblSide:'O', rosTeam:'A'};
 try { Object.assign(S, JSON.parse(localStorage.getItem('fbsMatchup') || '{}')); } catch(e) {}
@@ -266,6 +268,8 @@ function inTier(team, side, tier, yr = S.yr){
   const ps = (byTeam[team] || []).filter(p => p.side === side);
   return yr === 2027 ? ps.filter(p => p.r27 && p.r27 <= tier).sort((a,b) => a.r27 - b.r27) : ps.filter(p => p.st !== 'C' && p.rank <= tier);
 }
+// players who would be in this top-N on season snaps but are out now (portal, dismissed, injured, not playing)
+function outList(team, side, tier){ return (byTeam[team] || []).filter(p => p.side === side && p.out && p.orank <= tier).sort((a, b) => a.orank - b.orank); }
 const rankCache = {};
 function natRank(team, side, tier, yr){
   const k = `${side}${tier}${yr}`;
@@ -329,6 +333,13 @@ function render(){
     ['Projected margin', pr.margin, `${S.A} perspective`],
   ];
   $('math').innerHTML = cells.map(([k, v, s]) => `<div class="mcell"><span class="lbl">${esc(k)}</span><span class="v" style="color:${v > 0.05 ? 'var(--a)' : v < -0.05 ? 'var(--b)' : 'var(--ink)'}">${sgn(v)}</span><span class="note">${esc(s)}</span></div>`).join('');
+  { // who is out for this matchup: dropped from the talent edge, next man up counted instead
+    const bits = [S.A, S.B].map(tm => { const o = outList(tm, 'O', S.tier), d = outList(tm, 'D', S.tier);
+      const n = o.length + d.length; if (!n) return `${esc(tm)}: everyone available`;
+      const named = [...o, ...d].filter(p => p.outKind !== 'idle').map(p => `${esc(p.name)} (${esc(p.out)})`);
+      return `${esc(tm)}: <button class="tap" type="button" data-k="turn|${esc(tm)}|O|out">${o.length} offense</button> · <button class="tap" type="button" data-k="turn|${esc(tm)}|D|out">${d.length} defense</button> not available${named.length ? ' — ' + named.slice(0, 3).join(', ') + (named.length > 3 ? ', …' : '') : ''}`; });
+    $('outNote').innerHTML = S.yr === 2026 ? `<b>Availability (top ${S.tier}):</b> ${bits.join(' &nbsp;|&nbsp; ')}. Players who are out are left out of the talent edge; the next most-snapped player counts instead.` : '';
+  }
   if (S.yr === 2027){
     const f = pr.f;
     $('modelNote').textContent = `How the 2027 projection works: half of this season's results rating carries over (${f.a.toFixed(2)} × the gap), plus ${f.b.toFixed(2)} points per point of projected 2027 top-${S.tier} talent gap, plus ${f.hfa.toFixed(1)} points of home field. Those weights come from predicting 2026 games using 2025 results and 2026 talent: that picked ${Math.round(f.winner*100)}% of ${f.n} winners (typical miss ${f.rmse.toFixed(1)} points), against ${Math.round(f.winner_results_only*100)}% using last season's results alone. Outgoing transfers and the rest of the 2027 class are not known yet, so this moves after signing day and the portal window.`;
@@ -395,12 +406,12 @@ function playerRows(ps, svc, yr = S.yr){
   const hd = one >= 0 ? `<th>${esc(svc)}</th><th>Basis</th><th>Pct</th>` : `<th>247</th><th>Comp</th><th>On3</th><th>Ind</th><th>ESPN</th><th>Rivals</th><th>All</th>`;
   const body = ps.map(p => {
     const tag = p.st === 'T' ? `<span class="badge bt">TR from ${esc(p.from)}</span>` : p.st === 'NT' ? '<span class="badge bt">TR · JUCO/other</span>' : p.st === 'N' ? '<span class="badge bf">new</span>' : p.st === 'C' ? '<span class="badge bc">2027 commit</span>' : '';
-    const nm = `${esc(p.name)}${tag}${p.leave === 'E' && yr === 2026 ? '<span class="badge bl">leaving · out of eligibility</span>' : p.leave === 'P' && yr === 2026 ? '<span class="badge bl">leaving · transfer portal</span>' : ''}${p.fill ? '<span class="badge bf">roster fill</span>' : ''}`;
+    const nm = `${esc(p.name)}${tag}${p.leave === 'E' && yr === 2026 ? '<span class="badge bl">leaving · out of eligibility</span>' : p.leave === 'P' && yr === 2026 ? '<span class="badge bl">leaving · transfer portal</span>' : ''}${p.fill ? '<span class="badge bf">roster fill</span>' : ''}${p.out && yr === 2026 ? `<span class="badge bo">${esc(p.out)}</span>` : ''}`;
     const rc = x => x[2] === 'U' ? '<span class="basisU">–</span>' : `<span class="${x[2] === 'T' ? 'basisT' : ''}">${x[0] == null ? '–' : (+x[0]).toFixed(x[0] < 10 ? 1 : (x[0] % 1 ? 1 : 0))}</span>`;
     const cols = one >= 0
       ? (x => `<td>${rc(x)} ${stars(x[1])}</td><td>${x[2] === 'H' ? 'High school' : x[2] === 'T' ? '<span class="basisT">Portal only</span>' : '<span class="basisU">Unrated</span>'}</td><td>${fmt(x[3])}</td>`)(p.s[one])
       : p.s.map(rc).map(v => `<td>${v}</td>`).join('') + `<td><b>${fmt(p.all)}</b></td>`;
-    return `<tr><td class="num" style="font-family:var(--mono)">${yr === 2027 ? (p.r27 ?? '–') : p.rank || '–'}</td><td>${esc(p.pos)}</td><td style="text-align:left;font-family:var(--body)">${nm}<div class="note">${esc(p.cls || '')}${p.hs ? ' · HS ' + p.hs : ''}${p.snaps != null ? ` · ${p.snaps} snaps in ${p.games} games` : ''}</div></td>${cols}</tr>`;
+    return `<tr><td class="num" style="font-family:var(--mono)">${yr === 2027 ? (p.r27 ?? '–') : p.out ? 'Out' : p.rank || '–'}</td><td>${esc(p.pos)}</td><td style="text-align:left;font-family:var(--body)">${nm}<div class="note">${esc(p.cls || '')}${p.hs ? ' · HS ' + p.hs : ''}${p.snaps != null ? ` · ${p.snaps} snaps in ${p.games} games` : ''}${p.out && yr === 2026 && p.outWhy ? `<br>${esc(p.outWhy)}` : ''}</div></td>${cols}</tr>`;
   }).join('');
   return `<div class="tblwrap"><table class="pl"><tr><th>#</th><th>Pos</th><th style="text-align:left">Player</th>${hd}</tr>${body || '<tr><td colspan="9" class="note">No players.</td></tr>'}</table></div>`;
 }
@@ -412,16 +423,19 @@ function lostRows(ps){
 function roster(){
   const team = S.rosTeam === 'A' ? S.A : S.B; $('rosTier').textContent = S.tier; $('rosYr').textContent = S.yr === 2027 ? 'Projected 2027' : '2026';
   const o = inTier(team, 'O', S.tier), d = inTier(team, 'D', S.tier);
-  $('roster').innerHTML = `<h3 class="lbl" style="margin:4px 0">Offense · ${o.length}</h3>${playerRows(o, S.svc)}<h3 class="lbl" style="margin:14px 0 4px">Defense · ${d.length}</h3>${playerRows(d, S.svc)}
-    <p class="note">Players ranked by PFF snaps this season. Gold rating = portal-only rating (discounted in averages). TR from = on that school's 2025 roster. TR · JUCO/other = Ourlads lists him as a transfer but he was on no 2025 FBS or FCS roster. New = first year on any roster. Leaving = out of eligibility (senior or graduate) or announced transfer-portal entrant.</p>`;
+  const outOf = side => S.yr === 2026 ? outList(team, side, S.tier) : [];
+  const outBlock = side => { const x = outOf(side); return x.length ? `<h3 class="lbl" style="margin:10px 0 4px;color:var(--b)">${side === 'O' ? 'Offense' : 'Defense'} · not available (${x.length}) — replaced by the next most-snapped players</h3>${playerRows(x, S.svc)}` : ''; };
+  $('roster').innerHTML = `<h3 class="lbl" style="margin:4px 0">Offense · ${o.length}</h3>${playerRows(o, S.svc)}${outBlock('O')}<h3 class="lbl" style="margin:14px 0 4px">Defense · ${d.length}</h3>${playerRows(d, S.svc)}${outBlock('D')}
+    <p class="note">Players ranked by PFF snaps this season. Gold rating = portal-only rating (discounted in averages). TR from = on that school's 2025 roster. TR · JUCO/other = Ourlads lists him as a transfer but he was on no 2025 FBS or FCS roster. New = first year on any roster. Leaving = out of eligibility (senior or graduate) or announced transfer-portal entrant. Not available = no PFF snaps in the team's last two games, a reported season-ending injury, or a dismissal or portal departure; those players are dropped from the remaining-game projections and the next most-snapped player moves up. Reasons come from news reports and the Covers and CFB Apex injury reports where one exists.</p>`;
 }
 
 // ---------- talent change 2026 -> 2027 ----------
 function turnLists(team, side, t){
-  const now = inTier(team, side, t, 2026), next = inTier(team, side, t, 2027);
+  const now = inTier(team, side, t, 2026), next = inTier(team, side, t, 2027), out = outList(team, side, t), all = [...now, ...out];
   return {
-    leave: now.filter(p => p.leave),
-    leaveE: now.filter(p => p.leave === 'E'), leaveP: now.filter(p => p.leave === 'P'),
+    out,
+    leave: all.filter(p => p.leave),
+    leaveE: all.filter(p => p.leave === 'E'), leaveP: all.filter(p => p.leave === 'P'),
     arrive: next.filter(p => p.st === 'C'),
     ret: next.filter(p => p.st !== 'C'),
     tin: now.filter(p => p.st === 'T' || p.st === 'NT'),
@@ -446,6 +460,7 @@ function turnover(){
           <span>2026 transfers in <button class="tap" type="button" data-k="${k('tin')}">${L.tin.length}</button></span>
           <span>Lost to transfer <button class="tap" type="button" data-k="${k('lost')}">${L.lost.length}</button></span>
           <span>Freshmen in the top ${t} <button class="tap" type="button" data-k="${k('fresh')}">${L.fresh.length}</button></span>
+          <span>Not available now <button class="tap" type="button" data-k="${k('out')}">${L.out.length}</button></span>
         </div></div>`;
     }).join('');
     $(el).innerHTML = `<h3 style="font:800 18px/1 var(--display);text-transform:uppercase;margin:0;color:var(--${cls})">${esc(team)}</h3>${blocks}`;
@@ -518,8 +533,8 @@ function openSheet(key){
   if (kind === 'turn'){
     const [, team, side, x] = parts; const L = turnLists(team, side, t);
     ps = L[x]; const sd = side === 'O' ? 'offense' : 'defense';
-    title = {fresh: `${team}: freshmen in the top ${t}`, leaveE: `${team}: leaving, out of eligibility`, leaveP: `${team}: leaving, transfer portal`, leave: `${team}: leaving`, arrive: `${team}: 2027 commits in the top ${t}`, ret: `${team}: returning in 2027`, tin: `${team}: 2026 transfers in`, lost: `${team}: lost to transfer`}[x];
-    sub = {fresh: `True freshmen (2026 class) in the 2026 top ${t} ${sd}: early equity`, leaveE: `Seniors and graduates in the 2026 top ${t} ${sd}`, leaveP: `Announced portal entrants in the 2026 top ${t} ${sd} (the portal window opens in January)`, leave: `Seniors and graduates in the 2026 top ${t} ${sd}`, arrive: `Projected 2027 top ${t} ${sd}`, ret: `Projected 2027 top ${t} ${sd}`, tin: `2026 top ${t} ${sd} · from another 2025 roster`, lost: `On ${team}'s 2025 roster, now in another team's 2026 top 33 ${sd}`}[x] + ` · ${ps.length} players`;
+    title = {out: `${team}: not available now`, fresh: `${team}: freshmen in the top ${t}`, leaveE: `${team}: leaving, out of eligibility`, leaveP: `${team}: leaving, transfer portal`, leave: `${team}: leaving`, arrive: `${team}: 2027 commits in the top ${t}`, ret: `${team}: returning in 2027`, tin: `${team}: 2026 transfers in`, lost: `${team}: lost to transfer`}[x];
+    sub = {out: `Would be in the 2026 top ${t} ${sd} on season snaps; dropped from remaining-game projections`, fresh: `True freshmen (2026 class) in the 2026 top ${t} ${sd}: early equity`, leaveE: `Seniors and graduates in the 2026 top ${t} ${sd}`, leaveP: `Announced portal entrants in the 2026 top ${t} ${sd} (the portal window opens in January)`, leave: `Seniors and graduates in the 2026 top ${t} ${sd}`, arrive: `Projected 2027 top ${t} ${sd}`, ret: `Projected 2027 top ${t} ${sd}`, tin: `2026 top ${t} ${sd} · from another 2025 roster`, lost: `On ${team}'s 2025 roster, now in another team's 2026 top 33 ${sd}`}[x] + ` · ${ps.length} players`;
     $('shTitle').textContent = title; $('shSub').textContent = sub;
     $('shBody').innerHTML = x === 'lost' ? lostRows(ps) : playerRows(ps, S.svc, x === 'arrive' || x === 'ret' ? 2027 : 2026);
     const dlg = $('sheet'); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); return;
