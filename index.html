@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Matchups · The Post-Snap</title>
+<meta name="description" content="Head-to-head talent for every FBS matchup: recruiting ratings of each team's most-snapped players, unit by unit, with a projected winner and the 2027 outlook.">
+<meta property="og:title" content="Matchups · The Post-Snap">
+<meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f141c" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: tale-of-the-tape board. Two team columns face each other across a center spine; the projection sits on top like a scoreboard, units and positions below. */
+:root{
+  --bg:#f3f5f8; --panel:#ffffff; --ink:#151b26; --muted:#5d6676; --line:#d9dee7; --soft:#e9edf3;
+  --a:#1f4fbf; --a-soft:#e3eafb; --b:#b2372a; --b-soft:#f8e5e2; --gold:#b07a12; --good:#257a4a;
+  --display:"Big Shoulders Display","Arial Narrow",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141c; --panel:#171e2a; --ink:#e8edf5; --muted:#97a2b5; --line:#2a3445; --soft:#1e2735;
+  --a:#7aa2ff; --a-soft:#1d2a4a; --b:#ff8a78; --b-soft:#3d2320; --gold:#e3b04b; --good:#5fc28a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f141c; --panel:#171e2a; --ink:#e8edf5; --muted:#97a2b5; --line:#2a3445; --soft:#1e2735;
+  --a:#7aa2ff; --a-soft:#1d2a4a; --b:#ff8a78; --b-soft:#3d2320; --gold:#e3b04b; --good:#5fc28a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 40px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font:900 clamp(30px,6vw,46px)/0.95 var(--display);letter-spacing:.01em;text-transform:uppercase;margin:0;text-wrap:balance}
+h2{font:800 22px/1 var(--display);text-transform:uppercase;letter-spacing:.03em;margin:0}
+.sub{color:var(--muted);font-size:13px;margin-top:6px}
+.lbl{font:500 11px/1.2 var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+/* controls */
+.controls{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:end}
+.pick{display:flex;flex-direction:column;gap:5px;min-width:0}
+select{font:600 16px var(--body);color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;min-width:0}
+#teamA{border-left:5px solid var(--a)} #teamB{border-left:5px solid var(--b)}
+.swap{font:700 13px var(--body);background:var(--soft);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:11px 12px;cursor:pointer}
+.row{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{font:600 13px var(--body);background:transparent;color:var(--muted);border:0;padding:8px 12px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.small-sel{font-size:14px;padding:7px 10px;width:auto}
+button:focus-visible,select:focus-visible,.tap:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chip{flex:none;font:500 12px var(--body);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+.chip b{font-weight:600}
+/* scoreboard */
+.board{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:center}
+.side{display:flex;flex-direction:column;gap:4px;min-width:0}
+.side.b{text-align:right;align-items:flex-end}
+.tname{font:900 clamp(26px,5vw,40px)/0.95 var(--display);text-transform:uppercase;overflow-wrap:anywhere}
+.side.a .tname{color:var(--a)} .side.b .tname{color:var(--b)}
+.prob{font:800 clamp(34px,7vw,56px)/1 var(--display)}
+.mid{text-align:center;display:flex;flex-direction:column;gap:4px;align-items:center}
+.verdict{font:800 18px/1.1 var(--display);text-transform:uppercase;letter-spacing:.03em}
+.bar{height:12px;border-radius:6px;background:var(--b);overflow:hidden;display:flex}
+.bar i{display:block;background:var(--a);height:100%}
+.math{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.mcell{background:var(--soft);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.mcell .v{font:500 18px var(--mono)}
+.note{font-size:12.5px;color:var(--muted);max-width:75ch}
+/* team facts */
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fact{display:flex;flex-direction:column;gap:8px;min-width:0}
+.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kv div{display:flex;flex-direction:column}
+.kv .v{font:500 16px var(--mono)}
+.games{display:flex;flex-wrap:wrap;gap:4px}
+.g{font:500 11.5px var(--mono);border-radius:5px;padding:3px 6px;border:1px solid var(--line)}
+.g.w{background:color-mix(in srgb,var(--good) 14%,transparent);border-color:color-mix(in srgb,var(--good) 40%,transparent)}
+.g.l{background:var(--soft)}
+/* unit matchups */
+.units{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.unit h3{font:800 17px/1.1 var(--display);text-transform:uppercase;letter-spacing:.03em;margin:0 0 10px}
+.vs{display:grid;grid-template-columns:minmax(70px,auto) 1fr auto 1fr minmax(70px,auto);gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--soft)}
+.vs:first-of-type{border-top:0}
+.vs .grp{font:600 12px var(--body);color:var(--muted);text-align:center}
+.meter{height:8px;background:var(--soft);border-radius:4px;overflow:hidden}
+.meter i{display:block;height:100%}
+.meter.l{transform:scaleX(-1)}
+.tap{cursor:pointer;background:none;border:0;padding:2px 4px;border-radius:5px;color:inherit;font:inherit;text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,currentColor 45%,transparent)}
+.tap:hover{background:var(--soft)}
+.vs .tap.va{color:var(--a);font-family:var(--mono);text-align:right}
+.vs .tap.vb{color:var(--b);font-family:var(--mono);text-align:left}
+.edge{font:600 11px var(--body);border-radius:999px;padding:2px 7px;white-space:nowrap}
+.edge.ea{background:var(--a-soft);color:var(--a)} .edge.eb{background:var(--b-soft);color:var(--b)} .edge.ee{background:var(--soft);color:var(--muted)}
+/* tables */
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:500 11px var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:6px 8px;border-bottom:1px solid var(--soft);text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td:first-child{font-family:var(--body);font-weight:500}
+tr.all td{font-weight:600;background:var(--soft)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+/* player sheet */
+dialog{border:0;padding:0;border-radius:14px;background:var(--panel);color:var(--ink);width:min(720px,calc(100vw - 24px));max-height:min(82vh,820px);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(10,14,22,.5)}
+.sheet{display:flex;flex-direction:column;max-height:inherit}
+.sheet header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:16px 16px 10px;border-bottom:1px solid var(--line)}
+.sheet .body{overflow:auto;padding:4px 16px 16px}
+.x{font:600 14px var(--body);background:var(--soft);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer}
+.pl td{white-space:normal}
+.badge{font:600 10px var(--body);border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:1px}
+.bt{background:color-mix(in srgb,var(--gold) 20%,transparent);color:var(--gold)}
+.bf{background:var(--soft);color:var(--muted)}
+.basisT{color:var(--gold)} .basisU{color:var(--muted)}
+.dl{font:500 11px var(--mono);margin-left:4px}.dl.up{color:var(--good)}.dl.dn{color:var(--b)}
+.bc{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.bl{background:var(--b-soft);color:var(--b)}
+.turn{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tcard{display:flex;flex-direction:column;gap:10px;min-width:0}
+.tside{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:baseline;padding:10px 12px;background:var(--soft);border-radius:8px}
+.tside .big{font:800 26px/1 var(--display)}
+.tcounts{display:flex;flex-wrap:wrap;gap:6px 14px;grid-column:1/-1;font-size:13px}
+.yearflag{font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;background:var(--gold);color:var(--panel)}
+@media (max-width:720px){.turn{grid-template-columns:1fr}}
+.stars{color:var(--gold);letter-spacing:-1px}
+footer{color:var(--muted);font-size:12px;display:flex;flex-direction:column;gap:4px}
+@media (max-width:720px){
+  .controls{grid-template-columns:1fr 1fr}.controls .swap{grid-column:1/-1;order:3}
+  .facts,.units{grid-template-columns:1fr}
+  .board{grid-template-columns:1fr 1fr}.board .mid{grid-column:1/-1;order:3}
+  .vs{grid-template-columns:auto 1fr auto 1fr auto;gap:6px}
+}
+@media (prefers-reduced-motion:no-preference){.bar i,.meter i{transition:width .35s ease}}
+
+body{margin:0;padding-top:0}
+.pshead{margin-left:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1 * max(16px,env(safe-area-inset-right,0px)));margin-bottom:18px;position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+.pshead a{color:var(--ink);text-decoration:none}
+.pshead .home{font-family:var(--display);font-weight:900;font-size:22px;letter-spacing:.02em;text-transform:uppercase}
+.pshead .home span{color:var(--a)}
+.pshead .back{font-family:var(--body);font-weight:600;font-size:13px;color:var(--muted)}
+.pshead .back:hover{color:var(--a)}
+.psload{padding:40px 16px;text-align:center;color:var(--muted);font-family:var(--body)}
+</style>
+</head><body>
+<header class="pshead"><a class="home" href="/">The <span>Post-Snap</span></a><a class="back" href="/">&#8592; Team stats</a></header>
+<div class="psload" id="psload">Loading every FBS roster&hellip;</div>
+
+<div class="wrap">
+  <div>
+    <h1>Matchups</h1>
+    <div class="sub" id="asof"></div>
+  </div>
+
+  <section class="panel" style="display:flex;flex-direction:column;gap:14px" aria-label="Choose matchup">
+    <div class="controls">
+      <label class="pick"><span class="lbl">Team A</span><select id="teamA"></select></label>
+      <button class="swap" id="swap" type="button">⇄ Swap</button>
+      <label class="pick"><span class="lbl">Team B</span><select id="teamB"></select></label>
+    </div>
+    <div class="row">
+      <div class="pick"><span class="lbl">Season</span><div class="seg" id="yr" role="group" aria-label="Season"><button type="button" data-v="2026">2026 now</button><button type="button" data-v="2027">2027 projected</button></div></div>
+      <div class="pick"><span class="lbl">Where</span><div class="seg" id="site" role="group" aria-label="Site"><button type="button" data-v="A">A home</button><button type="button" data-v="N">Neutral</button><button type="button" data-v="B">B home</button></div></div>
+      <div class="pick"><span class="lbl">Players</span><div class="seg" id="tier" role="group" aria-label="Tier"><button type="button" data-v="11">Top 11</button><button type="button" data-v="22">Top 22</button><button type="button" data-v="32">Top 32</button><button type="button" data-v="33">Top 33</button></div></div>
+      <label class="pick"><span class="lbl">Service</span><select id="svc" class="small-sel"></select></label>
+      <div class="pick"><span class="lbl">Unrated players</span><div class="seg" id="unr" role="group" aria-label="Unrated"><button type="button" data-v="floor">At 2-star floor</button><button type="button" data-v="excl">Excluded</button></div></div>
+    </div>
+    <div class="pick"><span class="lbl" id="slateLbl">Remaining games</span><div class="chips" id="slate"></div></div>
+  </section>
+
+  <section class="panel" aria-label="Projection" style="display:flex;flex-direction:column;gap:14px">
+    <div class="board">
+      <div class="side a"><span class="lbl" id="recA"></span><span class="tname" id="nameA"></span><span class="prob num" id="probA"></span></div>
+      <div class="mid"><span class="yearflag" id="yrFlag" hidden>2027 projection</span><span class="lbl">Likely winner</span><span class="verdict" id="verdict"></span><span class="num" id="line" style="font-size:14px"></span></div>
+      <div class="side b"><span class="lbl" id="recB"></span><span class="tname" id="nameB"></span><span class="prob num" id="probB"></span></div>
+    </div>
+    <div class="bar" aria-hidden="true"><i id="barA"></i></div>
+    <div class="math" id="math"></div>
+    <p class="note" id="modelNote" style="margin:0"></p>
+  </section>
+
+  <section class="facts" aria-label="Season so far">
+    <div class="panel fact" id="factA"></div>
+    <div class="panel fact" id="factB"></div>
+  </section>
+
+  <section class="units" aria-label="Unit matchups">
+    <div class="panel unit" id="unit1"></div>
+    <div class="panel unit" id="unit2"></div>
+  </section>
+
+  <section class="panel" style="display:flex;flex-direction:column;gap:12px" aria-label="Roster turnover">
+    <div class="tabs"><h2>Talent change, 2026 → 2027</h2><span class="note" id="turnNote"></span></div>
+    <div class="turn"><div class="tcard" id="turnA"></div><div class="tcard" id="turnB"></div></div>
+    <p class="note" style="margin:0" id="turnFoot"></p>
+  </section>
+
+  <section class="panel" style="display:flex;flex-direction:column;gap:12px" aria-label="Schedule">
+    <div class="tabs"><h2>Talent gap, game by game</h2><div class="seg" id="schTeam" role="group" aria-label="Team"><button type="button" data-v="A">Team A</button><button type="button" data-v="B">Team B</button></div></div>
+    <p class="note" style="margin:0" id="schNote"></p>
+    <div class="tblwrap" id="sched"></div>
+  </section>
+
+  <section class="panel" style="display:flex;flex-direction:column;gap:12px" aria-label="Class impact">
+    <div class="tabs"><h2>2027 class impact</h2><div class="seg" id="clsScope" role="group" aria-label="Scope"><button type="button" data-v="conf">Their conferences</button><button type="button" data-v="all">All FBS</button></div></div>
+    <p class="note" style="margin:0" id="clsNote"></p>
+    <div class="tblwrap" id="classes"></div>
+  </section>
+
+  <section class="panel" style="display:flex;flex-direction:column;gap:12px" aria-label="Talent by service">
+    <div class="tabs"><h2>Talent by service</h2><div class="seg" id="tblSide" role="group" aria-label="Side"><button type="button" data-v="O">Offense</button><button type="button" data-v="D">Defense</button></div></div>
+    <p class="note" style="margin:0">Each service on its own scale; All Services is a 0–100 percentile. Tap any number to see the players behind it.</p>
+    <div class="tblwrap" id="tbl"></div>
+  </section>
+
+  <section class="panel" style="display:flex;flex-direction:column;gap:12px" aria-label="Rosters">
+    <div class="tabs"><h2><span id="rosYr"></span> top <span id="rosTier"></span></h2><div class="seg" id="rosTeam" role="group" aria-label="Team"><button type="button" data-v="A">Team A</button><button type="button" data-v="B">Team B</button></div></div>
+    <div class="tblwrap" id="roster"></div>
+  </section>
+
+  <footer id="foot"></footer>
+</div>
+
+<dialog id="sheet"><div class="sheet"><header><div><div class="lbl" id="shSub"></div><h2 id="shTitle" style="margin-top:4px"></h2></div><button class="x" id="shClose" type="button">Close</button></header><div class="body" id="shBody"></div></div></dialog>
+
+
+<script>
+(async () => {
+const inline = document.getElementById('data');
+const D = inline && inline.textContent.trim().startsWith('{') ? JSON.parse(inline.textContent) : await (await fetch('/api/matchups-data')).json();
+const SV = D.services, TEAMS = Object.keys(D.teams).sort();
+const P = D.players.map(r => ({team:r[0], side:r[1], rank:r[2], pos:r[3], name:r[4], cls:r[5], st:r[6], fill:r[7], hs:r[8], grp:r[9], s:r[10], all:r[11], from:r[12], r27:r[13], leave:r[14], snaps:r[15], games:r[16]}));
+const byTeam = {}; P.forEach(p => (byTeam[p.team] ??= []).push(p));
+const S = {schTeam:'A', clsScope:'conf', yr:2026, A:'Auburn', B:'Alabama', site:'N', tier:22, svc:'ALL', unr:'floor', tblSide:'O', rosTeam:'A'};
+try { Object.assign(S, JSON.parse(localStorage.getItem('fbsMatchup') || '{}')); } catch(e) {}
+let saved = false; try { saved = !!localStorage.getItem('fbsMatchup'); } catch(e) {}
+if (!D.teams[S.A]) S.A = 'Auburn'; if (!D.teams[S.B]) S.B = 'Alabama';
+if (!saved){ const nx = D.schedule.filter(g => g[2] === 'Auburn' || g[3] === 'Auburn').sort((a,b) => a[0]-b[0])[0]; if (nx){ S.A = 'Auburn'; S.B = nx[2] === 'Auburn' ? nx[3] : nx[2]; S.site = nx[4] ? 'N' : (nx[2] === 'Auburn' ? 'A' : 'B'); } }
+const $ = id => document.getElementById(id);
+const fmt = (v, d=1) => v == null ? '–' : (+v).toFixed(d);
+const sgn = (v, d=1) => v == null ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function phi(x){ const t = 1/(1+0.3275911*Math.abs(x)/Math.SQRT2); const y = 1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x/2); return x >= 0 ? (1+y)/2 : (1-y)/2; }
+
+// ---------- controls ----------
+for (const id of ['teamA','teamB']) $(id).innerHTML = TEAMS.map(t => { const c = D.teams[t].polls.cfp; return `<option value="${esc(t)}">${c ? '#' + c + ' ' : ''}${esc(t)} (${esc(D.teams[t].conf)})</option>`; }).join('');
+$('svc').innerHTML = `<option value="ALL">All Services</option>` + SV.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+function seg(id, key, cast = v => v){ const el = $(id); el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S[key] = cast(b.dataset.v); render(); }); }
+seg('schTeam','schTeam'); seg('clsScope','clsScope'); seg('yr','yr', Number); seg('site','site'); seg('tier','tier', Number); seg('unr','unr'); seg('tblSide','tblSide'); seg('rosTeam','rosTeam');
+$('teamA').onchange = e => { S.A = e.target.value; S.site = siteFromSchedule() ?? S.site; render(); };
+$('teamB').onchange = e => { S.B = e.target.value; S.site = siteFromSchedule() ?? S.site; render(); };
+$('svc').onchange = e => { S.svc = e.target.value; render(); };
+$('swap').onclick = () => { [S.A, S.B] = [S.B, S.A]; S.site = S.site === 'A' ? 'B' : S.site === 'B' ? 'A' : 'N'; render(); };
+function scheduled(){ return D.schedule.find(g => (g[2] === S.A && g[3] === S.B) || (g[2] === S.B && g[3] === S.A)); }
+function siteFromSchedule(){ const g = scheduled(); if (!g) return null; return g[4] ? 'N' : (g[2] === S.A ? 'A' : 'B'); }
+const weeks = [...new Set(D.schedule.map(g => g[0]))].sort((a,b) => a-b);
+$('slate').innerHTML = D.schedule.slice().sort((a,b) => a[0]-b[0] || a[1].localeCompare(b[1])).map((g,i) =>
+  `<button class="chip" type="button" data-i="${D.schedule.indexOf(g)}"><b>Wk ${g[0]}</b> ${esc(g[3])} ${g[4] ? 'vs' : 'at'} ${esc(g[2])}</button>`).join('');
+$('slateLbl').textContent = `Remaining games · weeks ${weeks.join(' & ')} · tap to load`;
+$('slate').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; const g = D.schedule[b.dataset.i]; S.A = g[3]; S.B = g[2]; S.site = g[4] ? 'N' : 'B'; render(); window.scrollTo({top: 0, behavior: 'smooth'}); });
+
+// ---------- helpers on talent ----------
+const TAL = (team, yr = S.yr) => (yr === 2027 ? D.talent27 : D.talent)[team];
+function talentVal(team, side, tier, svc = S.svc, unr = S.unr){
+  const r = TAL(team)[side + tier][svc]; return svc === 'ALL' ? r[unr === 'floor' ? 3 : 2] : r[unr === 'floor' ? 1 : 0];
+}
+function pctVal(team, side, tier, svc = S.svc, unr = S.unr, yr = S.yr){ const r = TAL(team, yr)[side + tier][svc]; return r[unr === 'floor' ? 3 : 2]; }
+function inTier(team, side, tier, yr = S.yr){
+  const ps = (byTeam[team] || []).filter(p => p.side === side);
+  return yr === 2027 ? ps.filter(p => p.r27 && p.r27 <= tier).sort((a,b) => a.r27 - b.r27) : ps.filter(p => p.st !== 'C' && p.rank <= tier);
+}
+const rankCache = {};
+function natRank(team, side, tier, yr){
+  const k = `${side}${tier}${yr}`;
+  if (!rankCache[k]) { const arr = TEAMS.map(t => [t, side === 'C' ? (pctVal(t,'O',tier,'ALL','floor',yr) + pctVal(t,'D',tier,'ALL','floor',yr)) / 2 : pctVal(t, side, tier, 'ALL', 'floor', yr)]).sort((a,b) => b[1]-a[1]); rankCache[k] = Object.fromEntries(arr.map(([t], i) => [t, i + 1])); }
+  return rankCache[k][team];
+}
+function playerScore(p, svc = S.svc, unr = S.unr){
+  if (svc === 'ALL') return p.all ?? (unr === 'floor' ? 0 : null);
+  const x = p.s[SV.indexOf(svc)]; return x[2] === 'U' ? (unr === 'floor' ? 0 : null) : x[3];
+}
+function groupScore(ps){ const v = ps.map(p => playerScore(p)).filter(v => v != null); return v.length ? v.reduce((a,b) => a+b, 0) / v.length : null; }
+
+// ---------- projection ----------
+function projection(){
+  if (S.yr === 2027){
+    const f = D.future.tiers[S.tier], A = S.A, B = S.B;
+    const res = f.a * (D.future.r26[A] - D.future.r26[B]), tal = f.b * (f.tal27[A] - f.tal27[B]);
+    const home = S.site === 'A' ? f.hfa : S.site === 'B' ? -f.hfa : 0, margin = res + tal + home;
+    return {res, tal, home, margin, pA: phi(margin / f.rmse), f};
+  }
+  const m = D.models[S.tier], A = S.A, B = S.B;
+  const res = m.rt[A] - m.rt[B], tal = D.beta * (m.tal[A] - m.tal[B]);
+  const home = S.site === 'A' ? m.hfa : S.site === 'B' ? -m.hfa : 0;
+  const margin = res + tal + home, pA = phi(margin / D.bench.sigma);
+  return {res, tal, home, margin, pA, m};
+}
+
+// ---------- render ----------
+function render(){
+  try { localStorage.setItem('fbsMatchup', JSON.stringify(S)); } catch(e) {}
+  $('teamA').value = S.A; $('teamB').value = S.B; $('svc').value = S.svc;
+  for (const [id, key] of [['schTeam','schTeam'],['clsScope','clsScope'],['yr','yr'],['site','site'],['tier','tier'],['unr','unr'],['tblSide','tblSide'],['rosTeam','rosTeam']])
+    $(id).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v == S[key])));
+  $('site').querySelector('[data-v="A"]').textContent = `${S.A} home`; $('site').querySelector('[data-v="B"]').textContent = `${S.B} home`;
+  $('rosTeam').querySelector('[data-v="A"]').textContent = S.A; $('rosTeam').querySelector('[data-v="B"]').textContent = S.B;
+
+  const pr = projection(), A = D.teams[S.A], B = D.teams[S.B];
+  const chip = t => { const p = D.teams[t].polls; return p.cfp ? `CFP #${p.cfp}` : p.ap ? `AP #${p.ap}` : ''; };
+  $('nameA').textContent = S.A; $('nameB').textContent = S.B;
+  $('recA').textContent = [chip(S.A), A.conf, `${A.w}-${A.l}`].filter(Boolean).join(' · '); $('recB').textContent = [chip(S.B), B.conf, `${B.w}-${B.l}`].filter(Boolean).join(' · ');
+  $('probA').textContent = Math.round(pr.pA * 100) + '%'; $('probB').textContent = Math.round((1 - pr.pA) * 100) + '%';
+  $('probA').style.color = 'var(--a)'; $('probB').style.color = 'var(--b)';
+  $('barA').style.width = (pr.pA * 100).toFixed(1) + '%';
+  const fav = pr.margin >= 0 ? S.A : S.B, pts = Math.abs(pr.margin);
+  $('verdict').textContent = pts < 0.5 ? 'Coin flip' : fav; $('verdict').style.color = pts < 0.5 ? 'var(--ink)' : (pr.margin >= 0 ? 'var(--a)' : 'var(--b)');
+  const g = scheduled();
+  let mkt = '';
+  if (S.yr === 2026 && g && g[5] != null){ const homeLine = g[5]; mkt = ` · market: ${homeLine < 0 ? g[2] : g[3]} by ${Math.abs(homeLine).toFixed(1)}`; }
+  $('line').textContent = (pts < 0.5 ? 'Even' : `by ${pts.toFixed(1)} pts`) + mkt;
+  $('yrFlag').hidden = S.yr !== 2027;
+  const siteTxt = S.site === 'N' ? 'neutral site' : (S.site === 'A' ? `${S.A} home` : `${S.B} home`);
+  const cells = S.yr === 2027 ? [
+    ['2026 results carried forward', pr.res, `rating ${sgn(D.future.r26[S.A])} vs ${sgn(D.future.r26[S.B])} × ${pr.f.a.toFixed(2)}`],
+    [`2027 talent edge (top ${S.tier})`, pr.tal, `${fmt(pr.f.tal27[S.A])} vs ${fmt(pr.f.tal27[S.B])} × ${pr.f.b.toFixed(2)}`],
+    ['Home field', pr.home, siteTxt],
+    ['Projected 2027 margin', pr.margin, `${S.A} perspective`],
+  ] : [
+    ['Season results edge', pr.res, `rating ${sgn(pr.m.rt[S.A])} vs ${sgn(pr.m.rt[S.B])}`],
+    [`Talent edge (top ${S.tier})`, pr.tal, `${fmt(pr.m.tal[S.A])} vs ${fmt(pr.m.tal[S.B])} × ${D.beta}`],
+    ['Home field', pr.home, siteTxt],
+    ['Projected margin', pr.margin, `${S.A} perspective`],
+  ];
+  $('math').innerHTML = cells.map(([k, v, s]) => `<div class="mcell"><span class="lbl">${esc(k)}</span><span class="v" style="color:${v > 0.05 ? 'var(--a)' : v < -0.05 ? 'var(--b)' : 'var(--ink)'}">${sgn(v)}</span><span class="note">${esc(s)}</span></div>`).join('');
+  if (S.yr === 2027){
+    const f = pr.f;
+    $('modelNote').textContent = `How the 2027 projection works: half of this season's results rating carries over (${f.a.toFixed(2)} × the gap), plus ${f.b.toFixed(2)} points per point of projected 2027 top-${S.tier} talent gap, plus ${f.hfa.toFixed(1)} points of home field. Those weights come from predicting 2026 games using 2025 results and 2026 talent: that picked ${Math.round(f.winner*100)}% of ${f.n} winners (typical miss ${f.rmse.toFixed(1)} points), against ${Math.round(f.winner_results_only*100)}% using last season's results alone. Outgoing transfers and the rest of the 2027 class are not known yet, so this moves after signing day and the portal window.`;
+  } else {
+    $('modelNote').textContent = `How it works: a margin rating built from every completed 2026 game (actual margins, no cap; FCS opponents pooled), plus ${D.beta} points per point of top-${S.tier} talent gap, plus ${pr.m.hfa.toFixed(1)} points of home field. Win odds assume a typical miss of ${D.bench.sigma.toFixed(1)} points. Tested week by week on games it hadn't seen, it picked ${Math.round(D.bench.model_winner*100)}% of winners (typical miss ${D.bench.model_rmse.toFixed(1)}); the betting line picked ${Math.round(D.bench.market_winner*100)}% of the same ${D.bench.n} games (typical miss ${D.bench.market_rmse.toFixed(1)}). The odds always use All Services talent with unrated at the floor; the service and unrated filters change the talent views below, not the odds.`;
+  }
+
+  for (const [el, t, cls] of [['factA', S.A, 'a'], ['factB', S.B, 'b']]){
+    const T = D.teams[t], n = T.w + T.l, r = T.ratings || {};
+    const rk = key => { const v = r[key]; if (v == null) return '–'; const all = TEAMS.map(x => (D.teams[x].ratings || {})[key]).filter(x => x != null); return `#${1 + all.filter(x => x > v).length}`; };
+    const pr_ = v => v ? `#${v}` : 'NR';
+    const games = T.g.slice().sort((x, y) => x[0] - y[0]).map(x => `<span class="g ${x[3] > x[4] ? 'w' : 'l'}" title="Week ${x[0]}">${x[3] > x[4] ? 'W' : 'L'} ${x[3]}-${x[4]} ${x[2] === 'A' ? '@' : x[2] === 'N' ? 'vs' : ''} ${esc(x[1])}</span>`).join('');
+    $(el).innerHTML = `<h2 style="color:var(--${cls})">${esc(t)} so far</h2>
+      <div class="kv"><div><span class="lbl">Record</span><span class="v">${T.w}-${T.l}</span></div><div><span class="lbl">Points / game</span><span class="v">${n ? (T.pf/n).toFixed(1) : '–'}</span></div><div><span class="lbl">Allowed / game</span><span class="v">${n ? (T.pa/n).toFixed(1) : '–'}</span></div>
+      <div><span class="lbl">CFP ranking</span><span class="v">${pr_(T.polls.cfp)}</span></div><div><span class="lbl">AP</span><span class="v">${pr_(T.polls.ap)}</span></div><div><span class="lbl">Coaches</span><span class="v">${pr_(T.polls.coaches)}</span></div>
+      <div><span class="lbl">SP+ rank</span><span class="v">${rk('sp')}</span><span class="note">rating ${fmt(r.sp)}</span></div><div><span class="lbl">FPI rank</span><span class="v">${rk('fpi')}</span><span class="note">rating ${fmt(r.fpi)}</span></div><div><span class="lbl">Elo rank</span><span class="v">${rk('elo')}</span><span class="note">rating ${fmt(r.elo, 0)}</span></div></div>
+      <p class="note" style="margin:0">Polls as of week ${D.polls_week}; NR = not in that top 25. SP+, FPI and Elo ranks are among all ${TEAMS.length} FBS teams (CollegeFootballData, refreshed daily).</p>
+      <div class="games">${games || '<span class="note">No games yet</span>'}</div>`;
+  }
+
+  unitPanel('unit1', S.A, S.B, 'a', 'b');
+  unitPanel('unit2', S.B, S.A, 'b', 'a');
+  table(); roster(); turnover(); schedule(); classImpact();
+}
+
+const PAIRS = [['QB','DB','QB vs secondary'],['RB','LB','RB vs LB'],['WR','DB','WR vs DB'],['TE','LB','TE vs LB'],['OL','DL','OL vs DL']];
+function unitPanel(el, off, def, co, cd){
+  const t = S.tier;
+  const rows = [['Whole unit', pctVal(off, 'O', t), pctVal(def, 'D', t), `unit|${off}|O`, `unit|${def}|D`]];
+  for (const [og, dg, label] of PAIRS){
+    const ops = inTier(off, 'O', t).filter(p => p.grp === og), dps = inTier(def, 'D', t).filter(p => p.grp === dg);
+    rows.push([label, groupScore(ops), groupScore(dps), `grp|${off}|O|${og}`, `grp|${def}|D|${dg}`]);
+  }
+  const w = v => v == null ? 0 : Math.max(0, Math.min(100, v));
+  const html = rows.map(([lab, a, b, ka, kb]) => {
+    const d = a != null && b != null ? a - b : null;
+    const edge = d == null ? '' : Math.abs(d) < 3 ? `<span class="edge ee">even</span>` : `<span class="edge e${d > 0 ? co : cd}">${esc(d > 0 ? off : def)} +${Math.abs(d).toFixed(1)}</span>`;
+    return `<div class="vs"><button class="tap va" data-k="${esc(ka)}" type="button">${fmt(a)}</button><div class="meter l"><i style="width:${w(a)}%;background:var(--${co})"></i></div><div class="grp">${esc(lab)}<br>${edge}</div><div class="meter"><i style="width:${w(b)}%;background:var(--${cd})"></i></div><button class="tap vb" data-k="${esc(kb)}" type="button">${fmt(b)}</button></div>`;
+  }).join('');
+  $(el).innerHTML = `<h3><span style="color:var(--${co})">${esc(off)} offense</span> vs <span style="color:var(--${cd})">${esc(def)} defense</span></h3>${html}
+    <p class="note" style="margin:8px 0 0">${S.svc === 'ALL' ? 'All Services' : esc(S.svc)} percentile, 0–100, top ${t} on each side, unrated ${S.unr === 'floor' ? 'scored as 0' : 'left out'}. Tap a number for the players.</p>`;
+}
+
+function table(){
+  const side = S.tblSide, t = S.tier, k = side + t;
+  const head = `<tr><th>Service</th><th colspan="2" style="text-align:center;color:var(--a)">${esc(S.A)}</th><th colspan="2" style="text-align:center;color:var(--b)">${esc(S.B)}</th></tr>
+    <tr><th></th><th>Avg</th><th>HS · Portal · Unrated</th><th>Avg</th><th>HS · Portal · Unrated</th></tr>`;
+  const cells = (team, svc) => {
+    const r = TAL(team)[k][svc], v = talentVal(team, side, t, svc);
+    const base = `${team}|${side}|${svc}`, dp = svc === 'Rivals' ? 2 : 1;
+    let dl = '';
+    if (S.yr === 2027){ const r0 = D.talent[team][k][svc], v0 = svc === 'ALL' ? r0[S.unr === 'floor' ? 3 : 2] : r0[S.unr === 'floor' ? 1 : 0];
+      if (v != null && v0 != null) { const d = v - v0; dl = `<span class="dl ${d > 0.05 ? 'up' : d < -0.05 ? 'dn' : ''}">${sgn(d, dp)}</span>`; } }
+    return `<td><button class="tap" type="button" data-k="svc|${esc(base)}">${fmt(v, dp)}</button>${dl}</td>
+      <td><button class="tap" type="button" data-k="basis|${esc(base)}|H">${r[4]}</button> · <button class="tap" type="button" data-k="basis|${esc(base)}|T">${r[5]}</button> · <button class="tap" type="button" data-k="basis|${esc(base)}|U">${r[6]}</button></td>`;
+  };
+  const rows = ['ALL', ...SV].map(s => `<tr class="${s === 'ALL' ? 'all' : ''}"><td>${s === 'ALL' ? 'All Services (pct)' : esc(s)}</td>${cells(S.A, s)}${cells(S.B, s)}</tr>`).join('');
+  $('tbl').innerHTML = `<table>${head}${rows}</table><p class="note">${S.yr === 2027 ? 'Projected 2027 lineup; small number = change from 2026. ' : ''}Avg counts unrated players ${S.unr === 'floor' ? 'at the 2-star floor' : 'as excluded'}. Portal = only a transfer-portal rating exists, counted at a ${Math.round(D.discount*100)}% discount above the floor.</p>`;
+}
+
+function stars(n){ return n ? `<span class="stars">${'★'.repeat(n)}</span>` : ''; }
+function playerRows(ps, svc, yr = S.yr){
+  const one = svc && svc !== 'ALL' ? SV.indexOf(svc) : -1;
+  const hd = one >= 0 ? `<th>${esc(svc)}</th><th>Basis</th><th>Pct</th>` : `<th>247</th><th>Comp</th><th>On3</th><th>Ind</th><th>ESPN</th><th>Rivals</th><th>All</th>`;
+  const body = ps.map(p => {
+    const tag = p.st === 'T' ? `<span class="badge bt">TR from ${esc(p.from)}</span>` : p.st === 'NT' ? '<span class="badge bt">TR · JUCO/other</span>' : p.st === 'N' ? '<span class="badge bf">new</span>' : p.st === 'C' ? '<span class="badge bc">2027 commit</span>' : '';
+    const nm = `${esc(p.name)}${tag}${p.leave === 'E' && yr === 2026 ? '<span class="badge bl">leaving · out of eligibility</span>' : p.leave === 'P' && yr === 2026 ? '<span class="badge bl">leaving · transfer portal</span>' : ''}${p.fill ? '<span class="badge bf">roster fill</span>' : ''}`;
+    const rc = x => x[2] === 'U' ? '<span class="basisU">–</span>' : `<span class="${x[2] === 'T' ? 'basisT' : ''}">${x[0] == null ? '–' : (+x[0]).toFixed(x[0] < 10 ? 1 : (x[0] % 1 ? 1 : 0))}</span>`;
+    const cols = one >= 0
+      ? (x => `<td>${rc(x)} ${stars(x[1])}</td><td>${x[2] === 'H' ? 'High school' : x[2] === 'T' ? '<span class="basisT">Portal only</span>' : '<span class="basisU">Unrated</span>'}</td><td>${fmt(x[3])}</td>`)(p.s[one])
+      : p.s.map(rc).map(v => `<td>${v}</td>`).join('') + `<td><b>${fmt(p.all)}</b></td>`;
+    return `<tr><td class="num" style="font-family:var(--mono)">${yr === 2027 ? (p.r27 ?? '–') : p.rank || '–'}</td><td>${esc(p.pos)}</td><td style="text-align:left;font-family:var(--body)">${nm}<div class="note">${esc(p.cls || '')}${p.hs ? ' · HS ' + p.hs : ''}${p.snaps != null ? ` · ${p.snaps} snaps in ${p.games} games` : ''}</div></td>${cols}</tr>`;
+  }).join('');
+  return `<div class="tblwrap"><table class="pl"><tr><th>#</th><th>Pos</th><th style="text-align:left">Player</th>${hd}</tr>${body || '<tr><td colspan="9" class="note">No players.</td></tr>'}</table></div>`;
+}
+
+function lostRows(ps){
+  const body = ps.slice().sort((a, b) => (b.all ?? -1) - (a.all ?? -1)).map(p => `<tr><td style="font-family:var(--body);text-align:left">${esc(p.name)}<div class="note">${esc(p.cls || '')}</div></td><td>${esc(p.pos)}</td><td style="font-family:var(--body);text-align:left">${esc(p.team)}</td><td>${p.rank}</td><td><b>${fmt(p.all)}</b></td></tr>`).join('');
+  return `<div class="tblwrap"><table class="pl"><tr><th style="text-align:left">Player</th><th>Pos</th><th style="text-align:left">Now at</th><th>Rank there</th><th>All</th></tr>${body || '<tr><td colspan="5" class="note">None in another team\'s top 33.</td></tr>'}</table></div>`;
+}
+function roster(){
+  const team = S.rosTeam === 'A' ? S.A : S.B; $('rosTier').textContent = S.tier; $('rosYr').textContent = S.yr === 2027 ? 'Projected 2027' : '2026';
+  const o = inTier(team, 'O', S.tier), d = inTier(team, 'D', S.tier);
+  $('roster').innerHTML = `<h3 class="lbl" style="margin:4px 0">Offense · ${o.length}</h3>${playerRows(o, S.svc)}<h3 class="lbl" style="margin:14px 0 4px">Defense · ${d.length}</h3>${playerRows(d, S.svc)}
+    <p class="note">Players ranked by PFF snaps this season. Gold rating = portal-only rating (discounted in averages). TR from = on that school's 2025 roster. TR · JUCO/other = Ourlads lists him as a transfer but he was on no 2025 FBS or FCS roster. New = first year on any roster. Leaving = out of eligibility (senior or graduate) or announced transfer-portal entrant.</p>`;
+}
+
+// ---------- talent change 2026 -> 2027 ----------
+function turnLists(team, side, t){
+  const now = inTier(team, side, t, 2026), next = inTier(team, side, t, 2027);
+  return {
+    leave: now.filter(p => p.leave),
+    leaveE: now.filter(p => p.leave === 'E'), leaveP: now.filter(p => p.leave === 'P'),
+    arrive: next.filter(p => p.st === 'C'),
+    ret: next.filter(p => p.st !== 'C'),
+    tin: now.filter(p => p.st === 'T' || p.st === 'NT'),
+    lost: P.filter(p => p.from === team && p.side === side && p.st === 'T'),
+    fresh: now.filter(p => /^FR/.test(p.cls || '')),
+  };
+}
+function turnover(){
+  const t = S.tier;
+  for (const [el, team, cls] of [['turnA', S.A, 'a'], ['turnB', S.B, 'b']]){
+    const blocks = ['O', 'D'].map(side => {
+      const v0 = pctVal(team, side, t, 'ALL', S.unr, 2026), v1 = pctVal(team, side, t, 'ALL', S.unr, 2027), d = v1 - v0;
+      const r0 = natRank(team, side, t, 2026), r1 = natRank(team, side, t, 2027), dr = r0 - r1;
+      const L = turnLists(team, side, t), k = x => `turn|${team}|${side}|${x}`;
+      return `<div class="tside"><span class="lbl">${side === 'O' ? 'Offense' : 'Defense'} · top ${t}</span><span></span>
+        <span class="big num">${fmt(v0)} → ${fmt(v1)}</span><span class="dl ${d > 0.05 ? 'up' : d < -0.05 ? 'dn' : ''}" style="font-size:14px">${sgn(d)}</span>
+        <span class="note">National rank</span><span class="num">#${r0} → #${r1} <span class="dl ${dr > 0 ? 'up' : dr < 0 ? 'dn' : ''}">${dr > 0 ? '▲' + dr : dr < 0 ? '▼' + (-dr) : 'even'}</span></span>
+        <div class="tcounts">
+          <span>Leaving: out of eligibility <button class="tap" type="button" data-k="${k('leaveE')}">${L.leaveE.length}</button> · transfer portal <button class="tap" type="button" data-k="${k('leaveP')}">${L.leaveP.length}</button></span>
+          <span>2027 commits in <button class="tap" type="button" data-k="${k('arrive')}">${L.arrive.length}</button></span>
+          <span>Returning <button class="tap" type="button" data-k="${k('ret')}">${L.ret.length}</button></span>
+          <span>2026 transfers in <button class="tap" type="button" data-k="${k('tin')}">${L.tin.length}</button></span>
+          <span>Lost to transfer <button class="tap" type="button" data-k="${k('lost')}">${L.lost.length}</button></span>
+          <span>Freshmen in the top ${t} <button class="tap" type="button" data-k="${k('fresh')}">${L.fresh.length}</button></span>
+        </div></div>`;
+    }).join('');
+    $(el).innerHTML = `<h3 style="font:800 18px/1 var(--display);text-transform:uppercase;margin:0;color:var(--${cls})">${esc(team)}</h3>${blocks}`;
+  }
+  $('turnNote').textContent = `All Services percentile, unrated ${S.unr === 'floor' ? 'at floor' : 'excluded'}`;
+  $('turnFoot').textContent = 'Rank is the honest read: incoming recruits are all rated while the backups they compete with often are not on a depth chart, so most teams gain a little raw talent. "Lost to transfer" = players from the 2025 roster who are now in another team\'s 2026 top 33, matched year over year from CFBD rosters. Outgoing 2027 transfers and late signees are unknown until December and January.';
+}
+
+// ---------- talent gap by game (Pink's Show style) ----------
+function teamScore(team, tier = S.tier, yr = 2026){
+  // offense and defense averaged: All Services percentile, or the chosen service's rating points
+  const o = talentVal(team, 'O', tier, S.svc, S.unr), d = talentVal(team, 'D', tier, S.svc, S.unr);
+  return (o != null && d != null) ? (o + d) / 2 : null;
+}
+function schedule(){
+  const team = S.schTeam === 'A' ? S.A : S.B, T = D.teams[team], me = teamScore(team);
+  const unit = S.svc === 'ALL' ? 'pct' : 'pts';
+  const played = T.g.map(g => ({wk: g[0], opp: g[1], site: g[2], pf: g[3], pa: g[4]}));
+  const left = D.schedule.filter(g => g[2] === team || g[3] === team).map(g => ({wk: g[0], opp: g[2] === team ? g[3] : g[2], site: g[4] ? 'N' : (g[2] === team ? 'H' : 'A'), spread: g[5], home: g[2]}));
+  const rows = [...played, ...left].sort((a, b) => a.wk - b.wk);
+  let advW = 0, advL = 0, disW = 0, disL = 0;
+  const m = D.models[S.tier];
+  const body = rows.map(r => {
+    const known = D.teams[r.opp], them = known ? teamScore(r.opp) : null, gap = (me != null && them != null) ? me - them : null;
+    let res = '', cls = '';
+    if (r.pf != null) { const w = r.pf > r.pa; res = `${w ? 'W' : 'L'} ${r.pf}-${r.pa}`; cls = w ? 'up' : 'dn';
+      if (gap != null) { if (gap > 0) w ? advW++ : advL++; else w ? disW++ : disL++; } }
+    else if (known) { const home = r.site === 'H' ? m.hfa : r.site === 'A' ? -m.hfa : 0;
+      const mg = m.rt[team] - m.rt[r.opp] + D.beta * (m.tal[team] - m.tal[r.opp]) + home; const p = phi(mg / D.bench.sigma);
+      res = `${Math.round(p * 100)}% · ${mg >= 0 ? 'by ' + mg.toFixed(1) : 'lose by ' + (-mg).toFixed(1)}`; }
+    const gapTxt = gap == null ? '<span class="note">FCS</span>' : `<span class="dl ${gap > 0.05 ? 'up' : gap < -0.05 ? 'dn' : ''}" style="font-size:13px">${sgn(gap)}</span>`;
+    const oppBtn = known ? `<button class="tap" type="button" data-opp="${esc(r.opp)}">${esc(r.opp)}</button>` : esc(r.opp);
+    return `<tr><td style="font-family:var(--mono)">${r.wk}</td><td style="text-align:left;font-family:var(--body)">${r.site === 'A' ? '@ ' : r.site === 'N' ? 'vs ' : ''}${oppBtn}${known && D.teams[r.opp].polls.cfp ? ` <span class="note">CFP #${D.teams[r.opp].polls.cfp}</span>` : ''}</td><td>${them == null ? '–' : fmt(them)}</td><td>${gapTxt}</td><td><span class="dl ${cls}" style="font-size:13px">${res}</span></td></tr>`;
+  }).join('');
+  $('sched').innerHTML = `<table><tr><th>Wk</th><th style="text-align:left">Opponent</th><th>Their talent</th><th>${esc(team)} edge</th><th>Result / projection</th></tr>${body}</table>`;
+  $('schNote').textContent = `${team} top-${S.tier} talent ${fmt(me)} (${S.svc === 'ALL' ? 'All Services percentile' : S.svc + ' rating points'}, offense and defense averaged). With the talent edge: ${advW}-${advL}. Without it: ${disW}-${disL}. Tap an opponent to load that matchup.`;
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-opp]'); if (!b) return; const team = S.schTeam === 'A' ? S.A : S.B; S.A = team; S.B = b.dataset.opp; S.site = siteFromSchedule() ?? 'N'; render(); window.scrollTo({top: 0, behavior: 'smooth'}); });
+
+// ---------- 2027 class impact: incoming class vs current top 32 ----------
+function classImpact(){
+  const svcIdx = S.svc === 'ALL' ? -1 : SV.indexOf(S.svc);
+  const score = p => svcIdx < 0 ? p.all : (p.s[svcIdx][2] === 'U' ? null : p.s[svcIdx][0]);
+  const rows = TEAMS.map(team => {
+    const cls = (byTeam[team] || []).filter(p => p.st === 'C'), vals = cls.map(score).filter(v => v != null);
+    const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    const cur = (talentVal(team, 'O', 32, S.svc, 'excl') + talentVal(team, 'D', 32, S.svc, 'excl')) / 2;
+    return {team, conf: D.teams[team].conf, n: cls.length, avg, cur, d: avg != null ? avg - cur : null};
+  }).filter(r => r.avg != null).sort((a, b) => b.d - a.d);
+  rows.forEach((r, i) => r.rank = i + 1);
+  const confs = new Set([D.teams[S.A].conf, D.teams[S.B].conf]);
+  const show = S.clsScope === 'all' ? rows : rows.filter(r => confs.has(r.conf));
+  const dp = S.svc === 'Rivals' ? 2 : 1;
+  $('classes').innerHTML = `<table><tr><th style="text-align:left">#</th><th style="text-align:left">Team</th><th>Commits</th><th>Class avg</th><th>Current top 32</th><th>Impact</th></tr>${show.map(r => `<tr style="${r.team === S.A ? 'background:var(--a-soft)' : r.team === S.B ? 'background:var(--b-soft)' : ''}"><td style="text-align:left">${r.rank}</td><td style="text-align:left;font-family:var(--body)">${esc(r.team)} <span class="note">${esc(r.conf)}</span></td><td><button class="tap" type="button" data-k="class|${esc(r.team)}">${r.n}</button></td><td>${fmt(r.avg, dp)}</td><td>${fmt(r.cur, dp)}</td><td><span class="dl ${r.d > 0 ? 'up' : 'dn'}" style="font-size:13px">${sgn(r.d, dp)}</span></td></tr>`).join('')}</table>`;
+  $('clsNote').textContent = `Average ${S.svc === 'ALL' ? 'All Services percentile' : S.svc + ' rating'} of each school's committed 2027 class against its current top 32 by PFF snaps (unrated excluded). A positive number means the class raises the talent level. Rank is among all FBS teams; classes are not final until signing day.`;
+}
+
+// ---------- player sheet ----------
+function openSheet(key){
+  const parts = key.split('|'), kind = parts[0], t = S.tier;
+  let ps = [], title = '', sub = '', svc = S.svc;
+  if (kind === 'unit'){ const [, team, side] = parts; ps = inTier(team, side, t); title = `${team} ${side === 'O' ? 'offense' : 'defense'}`; sub = `Top ${t} · ${svc === 'ALL' ? 'All Services' : svc}`; }
+  if (kind === 'grp'){ const [, team, side, g] = parts; ps = inTier(team, side, t).filter(p => p.grp === g); title = `${team} ${g}`; sub = `Top ${t} ${side === 'O' ? 'offense' : 'defense'} · ${ps.length} players`; }
+  if (kind === 'svc'){ const [, team, side, s] = parts; svc = s; ps = inTier(team, side, t); title = `${team} ${side === 'O' ? 'offense' : 'defense'}`; sub = `Top ${t} · ${s === 'ALL' ? 'All Services' : s}`; }
+  if (kind === 'class'){
+    const team = parts[1]; ps = (byTeam[team] || []).filter(p => p.st === 'C').sort((a, b) => (b.all ?? 0) - (a.all ?? 0));
+    $('shTitle').textContent = `${team}: 2027 commits`; $('shSub').textContent = `${ps.length} committed · ratings from each service`;
+    $('shBody').innerHTML = playerRows(ps, S.svc, 2027); const dlg = $('sheet'); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); return;
+  }
+  if (kind === 'turn'){
+    const [, team, side, x] = parts; const L = turnLists(team, side, t);
+    ps = L[x]; const sd = side === 'O' ? 'offense' : 'defense';
+    title = {fresh: `${team}: freshmen in the top ${t}`, leaveE: `${team}: leaving, out of eligibility`, leaveP: `${team}: leaving, transfer portal`, leave: `${team}: leaving`, arrive: `${team}: 2027 commits in the top ${t}`, ret: `${team}: returning in 2027`, tin: `${team}: 2026 transfers in`, lost: `${team}: lost to transfer`}[x];
+    sub = {fresh: `True freshmen (2026 class) in the 2026 top ${t} ${sd}: early equity`, leaveE: `Seniors and graduates in the 2026 top ${t} ${sd}`, leaveP: `Announced portal entrants in the 2026 top ${t} ${sd} (the portal window opens in January)`, leave: `Seniors and graduates in the 2026 top ${t} ${sd}`, arrive: `Projected 2027 top ${t} ${sd}`, ret: `Projected 2027 top ${t} ${sd}`, tin: `2026 top ${t} ${sd} · from another 2025 roster`, lost: `On ${team}'s 2025 roster, now in another team's 2026 top 33 ${sd}`}[x] + ` · ${ps.length} players`;
+    $('shTitle').textContent = title; $('shSub').textContent = sub;
+    $('shBody').innerHTML = x === 'lost' ? lostRows(ps) : playerRows(ps, S.svc, x === 'arrive' || x === 'ret' ? 2027 : 2026);
+    const dlg = $('sheet'); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); return;
+  }
+  if (kind === 'basis'){
+    const [, team, side, s, b] = parts; svc = s;
+    ps = inTier(team, side, t).filter(p => s === 'ALL'
+      ? (b === 'H' ? p.s.some(x => x[2] === 'H') : b === 'T' ? !p.s.some(x => x[2] === 'H') && p.s.some(x => x[2] === 'T') : p.s.every(x => x[2] === 'U'))
+      : p.s[SV.indexOf(s)][2] === b);
+    title = `${team}: ${b === 'H' ? 'high-school rated' : b === 'T' ? 'portal-only rating' : 'unrated'}`;
+    sub = `Top ${t} ${side === 'O' ? 'offense' : 'defense'} · ${s === 'ALL' ? 'any service' : s} · ${ps.length} players`;
+  }
+  $('shTitle').textContent = title; $('shSub').textContent = sub;
+  $('shBody').innerHTML = playerRows(ps, svc);
+  const d = $('sheet'); if (d.showModal) d.showModal(); else d.setAttribute('open', '');
+}
+document.addEventListener('click', e => { const b = e.target.closest('.tap[data-k]'); if (b) openSheet(b.dataset.k); });
+$('shClose').onclick = () => $('sheet').close();
+$('sheet').addEventListener('click', e => { if (e.target === $('sheet')) $('sheet').close(); });
+
+const last = new Date(D.last_played);
+$('asof').textContent = `2026 depth charts and recruiting ratings for all ${TEAMS.length} FBS teams · results through ${last.toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'America/Chicago'})}`;
+$('foot').innerHTML = `<span>Players ranked by PFF season-to-date snaps on each side of the ball: the 11, 22, 32 and 33 most-snapped players. Refreshed weekly from PFF.</span><span>Original high-school ratings from 247Sports, 247 Composite (via CollegeFootballData), On3, On3 Industry, ESPN and Rivals. Portal-only ratings count at a ${Math.round(D.discount*100)}% discount above each service's 2-star floor.</span><span>Results, SP+, FPI and Elo from CollegeFootballData. Market lines are the median across books.</span>`;
+render();
+document.getElementById('psload').hidden = true;
+})().catch(e => { document.getElementById('psload').textContent = 'The matchup data did not load. Refresh to try again.'; console.error(e); });
+</script>
+</body></html>
