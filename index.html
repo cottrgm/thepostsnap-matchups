@@ -230,7 +230,7 @@ const D = inline && inline.textContent.trim().startsWith('{') ? JSON.parse(inlin
 const SV = D.services, TEAMS = Object.keys(D.teams).sort();
 const P = D.players.map(r => ({team:r[0], side:r[1], rank:r[2], pos:r[3], name:r[4], cls:r[5], st:r[6], fill:r[7], hs:r[8], grp:r[9], s:r[10], all:r[11], from:r[12], r27:r[13], leave:r[14], snaps:r[15], games:r[16], out:r[17], outWhy:r[18], orank:r[19], outKind:r[20], outSrc:r[21]}));
 const byTeam = {}; P.forEach(p => (byTeam[p.team] ??= []).push(p));
-const S = {schTeam:'A', clsScope:'conf', yr:2026, A:'Auburn', B:'Alabama', site:'N', tier:22, svc:'ALL', unr:'floor', tblSide:'O', rosTeam:'A'};
+const S = {schTeam:'A', clsScope:'conf', clsSort:'d', yr:2026, A:'Auburn', B:'Alabama', site:'N', tier:22, svc:'ALL', unr:'floor', tblSide:'O', rosTeam:'A'};
 try { Object.assign(S, JSON.parse(localStorage.getItem('fbsMatchup') || '{}')); } catch(e) {}
 let saved = false; try { saved = !!localStorage.getItem('fbsMatchup'); } catch(e) {}
 if (!D.teams[S.A]) S.A = 'Auburn'; if (!D.teams[S.B]) S.B = 'Alabama';
@@ -252,8 +252,9 @@ $('svc').onchange = e => { S.svc = e.target.value; render(); };
 $('swap').onclick = () => { [S.A, S.B] = [S.B, S.A]; S.site = S.site === 'A' ? 'B' : S.site === 'B' ? 'A' : 'N'; render(); };
 function scheduled(){ return D.schedule.find(g => (g[2] === S.A && g[3] === S.B) || (g[2] === S.B && g[3] === S.A)); }
 function siteFromSchedule(){ const g = scheduled(); if (!g) return null; return g[4] ? 'N' : (g[2] === S.A ? 'A' : 'B'); }
-const weeks = [...new Set(D.schedule.map(g => g[0]))].sort((a,b) => a-b);
-$('slate').innerHTML = D.schedule.slice().sort((a,b) => a[0]-b[0] || a[1].localeCompare(b[1])).map((g,i) =>
+const weeks = [...new Set(D.schedule.map(g => g[0]))].sort((a,b) => a-b).slice(0, 2);
+const SLATE = D.schedule.filter(g => weeks.includes(g[0]));
+$('slate').innerHTML = SLATE.slice().sort((a,b) => a[0]-b[0] || a[1].localeCompare(b[1])).map((g,i) =>
   `<button class="chip" type="button" data-i="${D.schedule.indexOf(g)}"><b>Wk ${g[0]}</b> ${esc(g[3])} ${g[4] ? 'vs' : 'at'} ${esc(g[2])}</button>`).join('');
 $('slateLbl').textContent = `Remaining games · weeks ${weeks.join(' & ')} · tap to load`;
 $('slate').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; const g = D.schedule[b.dataset.i]; S.A = g[3]; S.B = g[2]; S.site = g[4] ? 'N' : 'B'; render(); window.scrollTo({top: 0, behavior: 'smooth'}); });
@@ -271,9 +272,17 @@ function inTier(team, side, tier, yr = S.yr){
 // players who would be in this top-N on season snaps but are out now (portal, dismissed, injured, not playing)
 function outList(team, side, tier){ return (byTeam[team] || []).filter(p => p.side === side && p.out && p.orank <= tier).sort((a, b) => a.orank - b.orank); }
 const rankCache = {};
-function natRank(team, side, tier, yr){
-  const k = `${side}${tier}${yr}`;
-  if (!rankCache[k]) { const arr = TEAMS.map(t => [t, side === 'C' ? (pctVal(t,'O',tier,'ALL','floor',yr) + pctVal(t,'D',tier,'ALL','floor',yr)) / 2 : pctVal(t, side, tier, 'ALL', 'floor', yr)]).sort((a,b) => b[1]-a[1]); rankCache[k] = Object.fromEntries(arr.map(([t], i) => [t, i + 1])); }
+function teamVal(team, side, tier, yr, svc = 'ALL', unr = S.unr){
+  const r = (yr === 2027 ? D.talent27 : D.talent)[team][side + tier][svc];
+  return svc === 'ALL' ? r[unr === 'floor' ? 3 : 2] : r[unr === 'floor' ? 1 : 0];
+}
+function natRank(team, side, tier, yr, svc = 'ALL', unr = S.unr){
+  const k = `${side}${tier}${yr}${svc}${unr}`;
+  if (!rankCache[k]) {
+    const v = t => side === 'C' ? (teamVal(t,'O',tier,yr,svc,unr) + teamVal(t,'D',tier,yr,svc,unr)) / 2 : teamVal(t, side, tier, yr, svc, unr);
+    const arr = TEAMS.map(t => [t, v(t)]).filter(x => x[1] != null && !Number.isNaN(x[1]));
+    rankCache[k] = Object.fromEntries(arr.map(([t, x]) => [t, 1 + arr.filter(y => y[1] > x).length]));
+  }
   return rankCache[k][team];
 }
 function playerScore(p, svc = S.svc, unr = S.unr){
@@ -476,27 +485,32 @@ function teamScore(team, tier = S.tier, yr = 2026){
   return (o != null && d != null) ? (o + d) / 2 : null;
 }
 function schedule(){
-  const team = S.schTeam === 'A' ? S.A : S.B, T = D.teams[team], me = teamScore(team);
-  const unit = S.svc === 'ALL' ? 'pct' : 'pts';
-  const played = T.g.map(g => ({wk: g[0], opp: g[1], site: g[2], pf: g[3], pa: g[4]}));
-  const left = D.schedule.filter(g => g[2] === team || g[3] === team).map(g => ({wk: g[0], opp: g[2] === team ? g[3] : g[2], site: g[4] ? 'N' : (g[2] === team ? 'H' : 'A'), spread: g[5], home: g[2]}));
-  const rows = [...played, ...left].sort((a, b) => a.wk - b.wk);
-  let advW = 0, advL = 0, disW = 0, disL = 0;
+  const team = S.schTeam === 'A' ? S.A : S.B, me = teamScore(team), myRank = natRank(team, 'C', S.tier, 2026, S.svc);
+  const rows = D.sched.filter(g => g[2] === team || g[3] === team).map(g => {
+    const home = g[2] === team, opp = home ? g[3] : g[2], oppFbs = home ? g[9] : g[8];
+    return {wk: g[0], date: g[1], opp, fbs: !!oppFbs, site: g[4] ? 'N' : home ? 'H' : 'A', pf: home ? g[5] : g[6], pa: home ? g[6] : g[5], post: g[10] !== 'regular'};
+  });
+  let advW = 0, advL = 0, disW = 0, disL = 0, fcsW = 0, fcsL = 0;
   const m = D.models[S.tier];
   const body = rows.map(r => {
-    const known = D.teams[r.opp], them = known ? teamScore(r.opp) : null, gap = (me != null && them != null) ? me - them : null;
+    const them = r.fbs ? teamScore(r.opp) : null, gap = (me != null && them != null) ? me - them : null;
     let res = '', cls = '';
     if (r.pf != null) { const w = r.pf > r.pa; res = `${w ? 'W' : 'L'} ${r.pf}-${r.pa}`; cls = w ? 'up' : 'dn';
-      if (gap != null) { if (gap > 0) w ? advW++ : advL++; else w ? disW++ : disL++; } }
-    else if (known) { const home = r.site === 'H' ? m.hfa : r.site === 'A' ? -m.hfa : 0;
-      const mg = m.rt[team] - m.rt[r.opp] + D.beta * (m.tal[team] - m.tal[r.opp]) + home; const p = phi(mg / D.bench.sigma);
-      res = `${Math.round(p * 100)}% · ${mg >= 0 ? 'by ' + mg.toFixed(1) : 'lose by ' + (-mg).toFixed(1)}`; }
-    const gapTxt = gap == null ? '<span class="note">FCS</span>' : `<span class="dl ${gap > 0.05 ? 'up' : gap < -0.05 ? 'dn' : ''}" style="font-size:13px">${sgn(gap)}</span>`;
-    const oppBtn = known ? `<button class="tap" type="button" data-opp="${esc(r.opp)}">${esc(r.opp)}</button>` : esc(r.opp);
-    return `<tr><td style="font-family:var(--mono)">${r.wk}</td><td style="text-align:left;font-family:var(--body)">${r.site === 'A' ? '@ ' : r.site === 'N' ? 'vs ' : ''}${oppBtn}${known && D.teams[r.opp].polls.cfp ? ` <span class="note">CFP #${D.teams[r.opp].polls.cfp}</span>` : ''}</td><td>${them == null ? '–' : fmt(them)}</td><td>${gapTxt}</td><td><span class="dl ${cls}" style="font-size:13px">${res}</span></td></tr>`;
+      if (gap != null) { if (gap > 0) w ? advW++ : advL++; else w ? disW++ : disL++; } else { w ? fcsW++ : fcsL++; } }
+    else { const home = r.site === 'H' ? m.hfa : r.site === 'A' ? -m.hfa : 0;
+      const oppRt = r.fbs ? m.rt[r.opp] : m.rt.FCS, tal = r.fbs ? D.beta * (m.tal[team] - m.tal[r.opp]) : 0;
+      const mg = m.rt[team] - oppRt + tal + home, p = phi(mg / D.bench.sigma);
+      res = `<span class="note">proj</span> ${Math.round(p * 100)}% · ${mg >= 0 ? 'by ' + mg.toFixed(1) : 'lose by ' + (-mg).toFixed(1)}`; }
+    const gapTxt = !r.fbs ? '<span class="note">FCS</span>' : gap == null ? '–' : `<span class="dl ${gap > 0.05 ? 'up' : gap < -0.05 ? 'dn' : ''}" style="font-size:13px">${sgn(gap)}</span>`;
+    const oppBtn = r.fbs ? `<button class="tap" type="button" data-opp="${esc(r.opp)}">${esc(r.opp)}</button>` : esc(r.opp);
+    const cfp = r.fbs && D.teams[r.opp].polls.cfp ? ` <span class="note">CFP #${D.teams[r.opp].polls.cfp}</span>` : '';
+    const theirs = r.fbs ? `${fmt(them)} <span class="note">#${natRank(r.opp, 'C', S.tier, 2026, S.svc)}</span>` : '–';
+    const d = new Date(r.date + 'T12:00:00'), dt = isNaN(d) ? '' : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    return `<tr><td style="font-family:var(--mono)">${r.post ? 'Post' : r.wk}</td><td class="note" style="white-space:nowrap">${dt}</td><td style="text-align:left;font-family:var(--body)">${r.site === 'A' ? '@ ' : r.site === 'N' ? 'vs ' : ''}${oppBtn}${cfp}</td><td>${theirs}</td><td>${gapTxt}</td><td style="white-space:nowrap"><span class="dl ${cls}" style="font-size:13px">${res}</span></td></tr>`;
   }).join('');
-  $('sched').innerHTML = `<table><tr><th>Wk</th><th style="text-align:left">Opponent</th><th>Their talent</th><th>${esc(team)} edge</th><th>Result / projection</th></tr>${body}</table>`;
-  $('schNote').textContent = `${team} top-${S.tier} talent ${fmt(me)} (${S.svc === 'ALL' ? 'All Services percentile' : S.svc + ' rating points'}, offense and defense averaged). With the talent edge: ${advW}-${advL}. Without it: ${disW}-${disL}. Tap an opponent to load that matchup.`;
+  const unitTxt = S.svc === 'ALL' ? 'All Services percentile' : S.svc + ' rating points';
+  $('sched').innerHTML = `<table><tr><th>Wk</th><th>Date</th><th style="text-align:left">Opponent</th><th title="Opponent's top-${S.tier} talent (offense and defense averaged) and its national rank among 138 FBS teams">Their talent · rank</th><th title="${esc(team)}'s talent minus the opponent's, same units">${esc(team)} edge</th><th>Result / projection</th></tr>${body}</table>`;
+  $('schNote').innerHTML = `<b>${esc(team)}</b> top-${S.tier} talent ${fmt(me)}, #${myRank} nationally (${unitTxt}, offense and defense averaged, unrated ${S.unr === 'floor' ? 'at the floor' : 'excluded'}; players who are out are left out). Record with the talent edge: <b>${advW}-${advL}</b>. Without it: <b>${disW}-${disL}</b>.${fcsW + fcsL ? ` Against FCS: ${fcsW}-${fcsL}.` : ''} Projections use the same model as the matchup above; FCS opponents get the pooled FCS rating. Tap an FBS opponent to load that matchup.`;
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-opp]'); if (!b) return; const team = S.schTeam === 'A' ? S.A : S.B; S.A = team; S.B = b.dataset.opp; S.site = siteFromSchedule() ?? 'N'; render(); window.scrollTo({top: 0, behavior: 'smooth'}); });
 
@@ -507,16 +521,32 @@ function classImpact(){
   const rows = TEAMS.map(team => {
     const cls = (byTeam[team] || []).filter(p => p.st === 'C'), vals = cls.map(score).filter(v => v != null);
     const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-    const cur = (talentVal(team, 'O', 32, S.svc, 'excl') + talentVal(team, 'D', 32, S.svc, 'excl')) / 2;
-    return {team, conf: D.teams[team].conf, n: cls.length, avg, cur, d: avg != null ? avg - cur : null};
-  }).filter(r => r.avg != null).sort((a, b) => b.d - a.d);
-  rows.forEach((r, i) => r.rank = i + 1);
+    const o = talentVal(team, 'O', 32, S.svc, 'excl'), d = talentVal(team, 'D', 32, S.svc, 'excl');
+    const cur = o != null && d != null ? (o + d) / 2 : null;
+    return {team, conf: D.teams[team].conf, n: cls.length, nr: vals.length, avg, cur, d: avg != null && cur != null ? avg - cur : null};
+  }).filter(r => r.avg != null && r.cur != null);
+  const rankBy = (key) => { for (const r of rows) r[key + 'Rk'] = 1 + rows.filter(x => x[key] > r[key]).length; };
+  rankBy('avg'); rankBy('d'); rankBy('cur');
+  // the sortable metrics; '#' always shows the national rank on whichever metric the table is sorted by
+  const cols = {d: [-1, 'Impact', 'dRk'], avg: [-1, 'Class avg', 'avgRk'], cur: [-1, 'Current top 32', 'curRk'], nr: [-1, 'Rated commits', null], team: [1, 'Team', null]};
+  if (!cols[S.clsSort]) S.clsSort = 'd';
+  const dir = S.clsSortDir ?? cols[S.clsSort][0];
+  const val = r => S.clsSort === 'team' ? r.team : r[S.clsSort];
+  rows.sort((a, b) => { const x = val(a), y = val(b); const c = typeof x === 'string' ? x.localeCompare(y) : (x - y); return dir * c || a.team.localeCompare(b.team); });
+  const rkKey = cols[S.clsSort][2] || 'dRk';
   const confs = new Set([D.teams[S.A].conf, D.teams[S.B].conf]);
   const show = S.clsScope === 'all' ? rows : rows.filter(r => confs.has(r.conf));
   const dp = S.svc === 'Rivals' ? 2 : 1;
-  $('classes').innerHTML = `<table><tr><th style="text-align:left">#</th><th style="text-align:left">Team</th><th>Commits</th><th>Class avg</th><th>Current top 32</th><th>Impact</th></tr>${show.map(r => `<tr style="${r.team === S.A ? 'background:var(--a-soft)' : r.team === S.B ? 'background:var(--b-soft)' : ''}"><td style="text-align:left">${r.rank}</td><td style="text-align:left;font-family:var(--body)">${esc(r.team)} <span class="note">${esc(r.conf)}</span></td><td><button class="tap" type="button" data-k="class|${esc(r.team)}">${r.n}</button></td><td>${fmt(r.avg, dp)}</td><td>${fmt(r.cur, dp)}</td><td><span class="dl ${r.d > 0 ? 'up' : 'dn'}" style="font-size:13px">${sgn(r.d, dp)}</span></td></tr>`).join('')}</table>`;
-  $('clsNote').textContent = `Average ${S.svc === 'ALL' ? 'All Services percentile' : S.svc + ' rating'} of each school's committed 2027 class against its current top 32 by PFF snaps (unrated excluded). A positive number means the class raises the talent level. Rank is among all FBS teams; classes are not final until signing day.`;
+  const th = (key, align) => { const on = S.clsSort === key; const arrow = on ? (dir > 0 ? ' ▲' : ' ▼') : '';
+    return `<th style="${align ? 'text-align:left;' : ''}cursor:pointer;white-space:nowrap${on ? ';color:var(--ink)' : ''}" data-cls-sort="${key}" aria-sort="${on ? (dir > 0 ? 'ascending' : 'descending') : 'none'}">${cols[key][1]}${arrow}</th>`; };
+  const rk = n => `<span class="note">#${n}</span>`;
+  $('classes').innerHTML = `<table><tr><th style="text-align:left" title="National rank on the sorted column">#</th>${th('team', 1)}${th('d')}${th('avg')}${th('cur')}${th('nr')}</tr>${show.map(r => `<tr style="${r.team === S.A ? 'background:var(--a-soft)' : r.team === S.B ? 'background:var(--b-soft)' : ''}"><td style="text-align:left;font-family:var(--mono)">${r[rkKey]}</td><td style="text-align:left;font-family:var(--body)">${esc(r.team)} <span class="note">${esc(r.conf)}</span></td><td><span class="dl ${r.d > 0 ? 'up' : 'dn'}" style="font-size:13px">${sgn(r.d, dp)}</span> ${rk(r.dRk)}</td><td>${fmt(r.avg, dp)} ${rk(r.avgRk)}</td><td>${fmt(r.cur, dp)} ${rk(r.curRk)}</td><td><button class="tap" type="button" data-k="class|${esc(r.team)}">${r.nr}</button>${r.n > r.nr ? `<span class="note"> of ${r.n}</span>` : ''}</td></tr>`).join('')}</table>`;
+  const unit = S.svc === 'ALL' ? 'All Services percentile (0-100, each service\'s rating converted to a percentile of its high-school pool, then averaged)' : `${S.svc} rating`;
+  $('clsNote').innerHTML = `<b>Impact</b> = class avg minus current top 32; positive means the incoming class is better than the players it joins. <b>Class avg</b> = average ${unit} of the school's rated 2027 commits. <b>Current top 32</b> = average of the 32 most-snapped available players on offense and on defense this season, same scale, unrated excluded. <b>Rated commits</b> = committed 2027 signees this service rates (tap to see them; "of N" = all commits). Small <b>#</b> = national rank on that column among ${rows.length} FBS teams; the first column is the rank on whichever column is sorted. Tap a column heading to sort. Classes are not final until signing day.`;
 }
+document.addEventListener('click', e => { const h = e.target.closest('[data-cls-sort]'); if (!h) return; const k = h.dataset.clsSort;
+  if (S.clsSort === k) S.clsSortDir = -(S.clsSortDir ?? (k === 'team' ? 1 : -1)); else { S.clsSort = k; S.clsSortDir = undefined; }
+  classImpact(); });
 
 // ---------- player sheet ----------
 function openSheet(key){
