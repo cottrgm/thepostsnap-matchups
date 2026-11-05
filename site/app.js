@@ -2403,6 +2403,7 @@
 
   /* ---- data ---- */
   function render() {
+    window.__psSeason = state.season;
     buildHero(); buildRatings(); buildMarket(); buildRank(); buildAdjusted();
     buildField(); buildSit(); buildTrend(); buildPlayers(); buildLimits();
     buildFresh(); buildH2H(); buildConf(); buildBoard(); buildPCChart(); buildTend();
@@ -2436,8 +2437,15 @@
   }
 
   function init() {
-    fetch('api/teams').then(function (r) { return r.json(); }).then(function (list) {
+    fetch('api/teams?v=polls').then(function (r) { return r.json(); }).then(function (list) {
       state.teams = list;
+      /* current CFP / AP / Coaches ranks, shown beside team names on the Games and League pages */
+      var ranks = {};
+      list.forEach(function (t) { if (t.cfp || t.ap || t.coaches) ranks[t.team] = { cfp: t.cfp, ap: t.ap, coaches: t.coaches }; });
+      window.TEAM_RANKS = ranks;
+      window.TEAM_RANKS_SEASON = list.length ? list[0].poll_season : null;
+      window.TEAM_RANKS_WEEK = list.length ? list[0].poll_week : null;
+      if (window.__tlRescan) window.__tlRescan();
       var dl = document.getElementById('teamList');
       list.forEach(function (t) {
         var o = document.createElement('option'); o.value = t.team;
@@ -2455,6 +2463,7 @@
       });
       document.getElementById('seasonSel').addEventListener('change', function (e) {
         state.season = +e.target.value;
+        window.__psSeason = state.season;
         board.vs = null; state.players = null;
         /* every league-wide cache is keyed on season */
         vstate.games = null; vstate.leagueData = {}; vstate.week = null;
@@ -2515,13 +2524,14 @@
 })();
 /* ---- team logos ---- */
 window.TEAM_LOGOS = {"Air Force":2005,"Akron":2006,"Alabama":333,"App State":2026,"Arizona":12,"Arizona State":9,"Arkansas":8,"Arkansas State":2032,"Army":349,"Auburn":2,"Ball State":2050,"Baylor":239,"Boise State":68,"Boston College":103,"Bowling Green":189,"Bucknell":2083,"Buffalo":2084,"BYU":252,"California":25,"Central Michigan":2117,"Charlotte":2429,"Cincinnati":2132,"Clemson":228,"Coastal Carolina":324,"Colorado":38,"Colorado State":36,"Delaware":48,"Duke":150,"East Carolina":151,"Eastern Michigan":2199,"Florida":57,"Florida Atlantic":2226,"Florida International":2229,"Florida State":52,"Fresno State":278,"Georgia":61,"Georgia Southern":290,"Georgia State":2247,"Georgia Tech":59,"Hawai'i":62,"Houston":248,"Illinois":356,"Indiana":84,"Iowa":2294,"Iowa State":66,"Jacksonville State":55,"James Madison":256,"Kansas":2305,"Kansas State":2306,"Kennesaw State":338,"Kent State":2309,"Kentucky":96,"Liberty":2335,"Louisiana":309,"Louisiana Tech":2348,"Louisville":97,"LSU":99,"Marshall":276,"Maryland":120,"Massachusetts":113,"Memphis":235,"Miami":2390,"Miami (OH)":193,"Michigan":130,"Michigan State":127,"Middle Tennessee":2393,"Minnesota":135,"Mississippi State":344,"Missouri":142,"Missouri State":2623,"Navy":2426,"NC State":152,"Nebraska":158,"Nevada":2440,"New Mexico":167,"New Mexico State":166,"North Carolina":153,"North Dakota State":2449,"North Texas":249,"Northern Illinois":2459,"Northwestern":77,"Notre Dame":87,"Ohio":195,"Ohio State":194,"Oklahoma":201,"Oklahoma State":197,"Old Dominion":295,"Ole Miss":145,"Oregon":2483,"Oregon State":204,"Penn State":213,"Pittsburgh":221,"Purdue":2509,"Rice":242,"Rutgers":164,"Sacramento State":16,"Sam Houston":2534,"San Diego State":21,"San Jos\u00e9 State":23,"SMU":2567,"South Alabama":6,"South Carolina":2579,"South Florida":58,"Southern Miss":2572,"Stanford":24,"Syracuse":183,"TCU":2628,"Temple":218,"Tennessee":2633,"Texas":251,"Texas A&M":245,"Texas State":326,"Texas Tech":2641,"Toledo":2649,"Troy":2653,"Tulane":2655,"Tulsa":202,"UAB":5,"UCF":2116,"UCLA":26,"UConn":41,"UL Monroe":2433,"UNLV":2439,"USC":30,"Utah":254,"Utah State":328,"UTEP":2638,"UTSA":2636,"Vanderbilt":238,"Virginia":258,"Virginia Tech":259,"Wake Forest":154,"Washington":264,"Washington State":265,"West Virginia":277,"Western Kentucky":98,"Western Michigan":2711,"Wisconsin":275,"Wyoming":2751};
-/* Team logos: any element whose own text starts with an exact FBS team name gets
-   that team's logo in front of it. Runs on everything the app renders, now and later,
-   so new views pick logos up without their own code. Logos: ESPN's team logo CDN
-   (CollegeFootballData team ids are ESPN ids). */
+/* Team logos (everywhere) and current poll ranks (Games and League pages). Any element whose
+   own text is an exact FBS team name gets the team's logo in front of it; inside the Games and
+   League views it also gets the team's current CFP rank (AP when there is no CFP ranking yet).
+   Runs on everything the app renders, now and later. Logos: ESPN's team logo CDN. */
 (function () {
   var IDS = window.TEAM_LOGOS || {};
   var SKIP = { OPTION: 1, SELECT: 1, TEXTAREA: 1, TITLE: 1, SCRIPT: 1, STYLE: 1, INPUT: 1, svg: 1, text: 1, tspan: 1 };
+  var RANK_SCOPE = '#viewGames, #viewLeague';
   var dark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   function isDark() {
     var t = document.documentElement.getAttribute('data-theme');
@@ -2530,24 +2540,48 @@ window.TEAM_LOGOS = {"Air Force":2005,"Akron":2006,"Alabama":333,"App State":202
   function url(id, d) {
     return 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/ncaa/500' + (d ? '-dark' : '') + '/' + id + '.png&h=96&w=96';
   }
+  function isMark(n) { return n && n.nodeType === 1 && n.classList && (n.classList.contains('tlogo') || n.classList.contains('prk')); }
+  function rankFor(name) {
+    var R = window.TEAM_RANKS || {};
+    if (!R[name] || window.__psSeason !== window.TEAM_RANKS_SEASON) return null;
+    var r = R[name], useCfp = Object.keys(R).some(function (k) { return R[k].cfp; });
+    var n = useCfp ? r.cfp : r.ap;
+    if (!n) return null;
+    var bits = [];
+    if (r.cfp) bits.push('CFP #' + r.cfp); if (r.ap) bits.push('AP #' + r.ap); if (r.coaches) bits.push('Coaches #' + r.coaches);
+    return { n: n, title: bits.join(' · ') + (window.TEAM_RANKS_WEEK ? ' (week ' + window.TEAM_RANKS_WEEK + ')' : '') };
+  }
   function decorate(el) {
     if (SKIP[el.tagName] || el.closest('svg, select, [data-no-logo]')) return;
-    var first = el.firstChild;
-    if (!first || first.nodeType !== 3) return;
-    var name = first.nodeValue.trim();
+    var c = el.firstChild;
+    while (isMark(c)) c = c.nextSibling;
+    if (!c || c.nodeType !== 3) return;
+    var name = c.nodeValue.trim();
     var id = IDS[name];
     if (!id) return;
-    if (first.previousSibling && first.previousSibling.classList && first.previousSibling.classList.contains('tlogo')) return;
-    if (el.firstElementChild && el.firstElementChild.classList.contains('tlogo')) return;
-    var img = document.createElement('img');
-    img.className = 'tlogo'; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
-    img.width = 20; img.height = 20; img.dataset.id = id;
-    img.src = url(id, isDark());
-    img.onerror = function () {
-      if (this.dataset.fallback) { this.remove(); return; }
-      this.dataset.fallback = '1'; this.src = url(id, false);
-    };
-    el.insertBefore(img, first);
+    var hasLogo = false, hasRank = false;
+    for (var n = el.firstChild; n !== c; n = n.nextSibling) {
+      if (n.classList.contains('tlogo')) hasLogo = true; else if (n.classList.contains('prk')) hasRank = true;
+    }
+    if (!hasLogo) {
+      var img = document.createElement('img');
+      img.className = 'tlogo'; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+      img.width = 20; img.height = 20; img.dataset.id = id;
+      img.src = url(id, isDark());
+      img.onerror = function () {
+        if (this.dataset.fallback) { this.remove(); return; }
+        this.dataset.fallback = '1'; this.src = url(this.dataset.id, false);
+      };
+      el.insertBefore(img, el.firstChild);
+    }
+    if (!hasRank && el.closest(RANK_SCOPE)) {
+      var rk = rankFor(name);
+      if (rk) {
+        var s = document.createElement('span');
+        s.className = 'prk'; s.textContent = rk.n; s.title = rk.title;
+        el.insertBefore(s, c);
+      }
+    }
   }
   function scan(root) {
     if (!root || root.nodeType !== 1) return;
@@ -2555,6 +2589,7 @@ window.TEAM_LOGOS = {"Air Force":2005,"Akron":2006,"Alabama":333,"App State":202
     var all = root.getElementsByTagName('*');
     for (var i = 0; i < all.length; i++) decorate(all[i]);
   }
+  window.__tlRescan = function () { scan(document.body); };
   var pending = [], queued = false;
   function flush() {
     queued = false;
@@ -2567,7 +2602,7 @@ window.TEAM_LOGOS = {"Air Force":2005,"Akron":2006,"Alabama":333,"App State":202
       if (m.type === 'characterData') { if (m.target.parentNode) pending.push(m.target.parentNode); continue; }
       for (var j = 0; j < m.addedNodes.length; j++) {
         var n = m.addedNodes[j];
-        if (n.nodeType === 1 && n.classList.contains('tlogo')) continue;
+        if (isMark(n)) continue;
         pending.push(n.nodeType === 3 ? n.parentNode : n);
       }
     }
