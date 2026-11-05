@@ -1,0 +1,24 @@
+
+/* ---------- on the field ---------- */
+#fdChart{transition:opacity .15s}
+.fdwrap{display:grid;grid-template-columns:minmax(0,640px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:980px){.fdwrap{grid-template-columns:1fr}}
+.fdfield{min-width:0}
+.fdsvg{display:block;width:100%;max-width:640px;height:auto;border-radius:6px}
+.fdsvg text{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif}
+.fdsvg .fdnum{fill:rgba(255,255,255,.85)!important;font-size:17px;font-weight:600}
+.fdsvg .fdlos{fill:rgba(255,255,255,.9)!important;font-size:12px;letter-spacing:.14em;font-weight:600}
+.fdsvg .fdzone{cursor:pointer}
+.fdsvg .fdlab{cursor:pointer}
+.fdsvg .fdlabbg{fill:rgba(15,20,28,.72)}
+.fdsvg .fdlabv{fill:#fff!important;font-size:17px;font-weight:700}
+.fdsvg .fdlabr{fill:rgba(255,255,255,.82)!important;font-size:11px;letter-spacing:.04em}
+.fdsvg .fddot{pointer-events:visiblePainted}
+.fdside{display:flex;flex-direction:column;gap:10px;min-width:0}
+.fdh{font-family:"Big Shoulders Display","Arial Narrow",sans-serif;font-size:20px;text-transform:uppercase;letter-spacing:.03em}
+table.fdtab{min-width:0;font-size:13.5px}
+table.fdtab td,table.fdtab th{padding:6px 9px}
+.fdrk{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--muted)}
+.fdsub{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.fdtop{margin:0;padding-left:18px;font-size:14px;color:var(--ink-2);display:flex;flex-direction:column;gap:3px}
+.fdbtns{display:flex;gap:8px;flex-wrap:wrap}

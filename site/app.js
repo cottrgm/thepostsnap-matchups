@@ -206,7 +206,7 @@
       host.appendChild(reset);
     }
   }
-  function refreshPC() { buildPCChart(); buildTend(); }
+  function refreshPC() { buildPCChart(); buildTend(); buildFieldLive(); }
 
   function buildPCChart() {
     var host = document.getElementById('pcChart');
@@ -449,6 +449,244 @@
     document.getElementById('pcSheetClose').onclick = function () { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); };
     dlg.addEventListener('click', function (e) { if (e.target === dlg && dlg.close) dlg.close(); });
   })();
+
+  /* ---- on the field: where passes are thrown and runs go, drawn to scale on a field ----
+     Offense moves up the page. The line of scrimmage is the blue line; every yard line is
+     measured from it. Lanes follow the college hashes (60 ft in from each sideline): left of
+     the left hash, between the hashes, right of the right hash. */
+  var FZ = { B: [-10, 0, 'Behind the line'], S: [0, 10, 'Short (0-9)'], I: [10, 20, 'Intermediate (10-19)'], D: [20, 50, 'Deep (20+)'] };
+  var FL = { L: 'Left', M: 'Middle', R: 'Right' };
+  var FW = 53.33, HASH_L = 20, HASH_R = 33.33, K = 11.25;          /* yards; px per yard */
+  var FTOP = 52, FMAX = 50, FMIN = -10;                              /* draw from 50 past the line to 10 behind */
+  state.fdMode = state.fdMode || 0; state.fdSide = state.fdSide || 0; state.fdColor = state.fdColor || 0; state.fdSel = null;
+  function fy(yd) { return FTOP + (FMAX - Math.max(FMIN, Math.min(FMAX, yd))) * K; }
+  function fx(yd) { return 30 + yd * K; }
+  function laneX(d) { return d === 'L' ? [0, HASH_L] : d === 'M' ? [HASH_L, HASH_R] : [HASH_R, FW]; }
+  function jitter(seed) { var x = Math.sin(seed * 12.9898) * 43758.5453; return x - Math.floor(x); }
+  function rankTxt(rk, pool) { return rk ? '#' + rk + (pool ? ' of ' + pool : '') : '–'; }
+
+  function buildFieldLive() {
+    var host = document.getElementById('fdChart');
+    if (!host) return;
+    var sides = ['Offense', 'Defense'];
+    var side = sides[state.fdSide] || 'Offense';
+    segs(document.getElementById('fdModeTabs'), ['Pass targets', 'Runs'], state.fdMode, function (i) { state.fdMode = i; state.fdColor = 0; state.fdSel = null; drawFieldLive(); });
+    segs(document.getElementById('fdSideTabs'), ['Their offense', 'What their defense allows'], state.fdSide, function (i) { state.fdSide = i; state.fdSel = null; buildFieldLive(); });
+    var seq = state.fdSeq = (state.fdSeq || 0) + 1;
+    if (!host.firstChild) host.appendChild(h('p', 'ax', 'Loading the field…'));
+    host.style.opacity = '.55';
+    Promise.all([
+      fetch('api/field?' + pcQuery(side)).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }),
+      fetch('api/pc?' + pcQuery(side)).then(function (r) { return r.ok ? r.json() : { games: [] }; })
+    ]).then(function (res) {
+      if (seq !== state.fdSeq) return; host.style.opacity = '';
+      pcFilters(document.getElementById('fdFilters'), res[1].games, refreshPC);
+      state.fdData = res[0]; state.fdData.sideName = side;
+      drawFieldLive();
+    }).catch(function (e) { if (seq !== state.fdSeq) return; host.style.opacity = ''; host.innerHTML = ''; host.appendChild(h('p', 'ax', 'Could not load the field. ' + e.message)); });
+  }
+
+  function drawFieldLive() {
+    var host = document.getElementById('fdChart'), j = state.fdData;
+    if (!host || !j) return;
+    var side = j.sideName, runs = state.fdMode === 1, Z = j.zones || {};
+    var colorOpts = runs ? [['share', 'Share of runs'], ['epa', 'EPA per run'], ['sr', 'Success rate'], ['expl', 'Explosive rate (12+)'], ['stuff', 'Stuff rate (0 or less)']]
+                         : [['share', 'Share of targets'], ['epa', 'EPA per target'], ['sr', 'Success rate'], ['cmp', 'Completion %'], ['ypp', 'Yards per target']];
+    segs(document.getElementById('fdColorTabs'), colorOpts.map(function (c) { return c[1]; }), state.fdColor, function (i) { state.fdColor = i; drawFieldLive(); });
+    var metric = colorOpts[state.fdColor][0];
+    var d = isDarkTheme();
+    var W = Math.round(fx(FW) + 30), H = Math.round(fy(FMIN) + 40);
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'fdsvg', role: 'img', 'aria-label': (runs ? 'Run lanes' : 'Pass targets') + ' on a football field' });
+    /* turf and markings */
+    var turfA = d ? '#1d4a2c' : '#3f8a4f', turfB = d ? '#1a4428' : '#3a8149', line = d ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.9)';
+    svg.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, rx: 6, fill: d ? '#173d24' : '#357a44' }));
+    for (var yd = FMIN; yd < FMAX; yd += 5) {
+      svg.appendChild(el('rect', { x: fx(0), y: fy(yd + 5), width: FW * K, height: 5 * K, fill: ((yd + 10) / 5) % 2 ? turfA : turfB }));
+    }
+    svg.appendChild(el('rect', { x: fx(0), y: fy(FMAX), width: FW * K, height: (FMAX - FMIN) * K, fill: 'none', stroke: line, 'stroke-width': 3 }));
+    for (yd = FMIN; yd <= FMAX; yd++) {
+      var y = fy(yd);
+      if (yd % 5 === 0) {
+        svg.appendChild(el('line', { x1: fx(0), x2: fx(FW), y1: y, y2: y, stroke: line, 'stroke-width': yd % 10 === 0 ? 2 : 1.2 }));
+        if (yd % 10 === 0 && yd !== 0) {
+          var lab = (yd > 0 ? '+' : '') + yd;
+          svg.appendChild(el('text', { x: fx(5), y: y + 6, class: 'fdnum', 'text-anchor': 'middle' }, lab));
+          svg.appendChild(el('text', { x: fx(FW - 5), y: y + 6, class: 'fdnum', 'text-anchor': 'middle' }, lab));
+        }
+      } else {
+        [0.6, HASH_L, HASH_R, FW - 0.6].forEach(function (hx) {
+          svg.appendChild(el('line', { x1: fx(hx) - 5, x2: fx(hx) + 5, y1: y, y2: y, stroke: line, 'stroke-width': 1 }));
+        });
+      }
+    }
+    /* line of scrimmage */
+    svg.appendChild(el('line', { x1: fx(0), x2: fx(FW), y1: fy(0), y2: fy(0), stroke: d ? '#7aa2ff' : '#1f4fbf', 'stroke-width': 4 }));
+    svg.appendChild(el('text', { x: fx(FW / 2), y: fy(0) + 22, class: 'fdlos', 'text-anchor': 'middle' }, 'LINE OF SCRIMMAGE'));
+    svg.appendChild(el('text', { x: fx(FW / 2), y: FTOP - 18, class: 'fdlos', 'text-anchor': 'middle' }, side === 'Offense' ? 'OFFENSE MOVES THIS WAY ↑' : 'OPPONENT OFFENSE MOVES THIS WAY ↑'));
+
+    /* zones */
+    var zoneKeys = runs ? ['RL', 'RM', 'RR'] : ['DL', 'DM', 'DR', 'IL', 'IM', 'IR', 'SL', 'SM', 'SR', 'BL', 'BM', 'BR'];
+    var maxShare = 0; zoneKeys.forEach(function (k) { if (Z[k] && Z[k].share > maxShare) maxShare = Z[k].share; });
+    zoneKeys.forEach(function (k) {
+      var z = Z[k], lane = laneX(k[1]);
+      var y0 = runs ? fy(FMAX) : fy(FZ[k[0]][1]), y1 = runs ? fy(FMIN) : fy(FZ[k[0]][0]);
+      var fill, op;
+      if (!z) { fill = 'transparent'; op = 0; }
+      else if (metric === 'share') { fill = d ? '#7aa2ff' : '#1f4fbf'; op = 0.08 + 0.55 * (z.share / (maxShare || 1)); }
+      else { var rk = z['rk_' + metric]; var p = rk && z.pool > 1 ? 1 - (rk - 1) / (z.pool - 1) : null; fill = shade(p); op = p === null ? 0.15 : 0.78; }
+      var r = el('rect', { x: fx(lane[0]) + 2, y: y0 + 2, width: (lane[1] - lane[0]) * K - 4, height: y1 - y0 - 4, rx: 4, fill: fill, 'fill-opacity': op,
+        stroke: state.fdSel === k ? (d ? '#fff' : '#151b26') : 'rgba(255,255,255,.35)', 'stroke-width': state.fdSel === k ? 3 : 1, class: 'fdzone' });
+      r.addEventListener('click', function () { state.fdSel = state.fdSel === k ? null : k; drawFieldLive(); });
+      svg.appendChild(r);
+    });
+
+    /* dots: every target / every run */
+    var pts = runs ? (j.runs || []) : (j.passes || []);
+    pts.forEach(function (p, i) {
+      var dir = runs ? p[0] : p[1], yd = runs ? p[1] : p[0];
+      if (!dir || yd === null || yd === undefined) return;
+      var lane = laneX(dir), x = fx(lane[0] + 1 + jitter(i + 1) * (lane[1] - lane[0] - 2)), y = fy(yd + (jitter(i + 7) - 0.5) * 0.8);
+      var c;
+      if (runs) {
+        var col = p[1] <= 0 ? (d ? '#ff8a78' : '#c0392b') : p[1] >= 12 ? '#f4c542' : '#ffffff';
+        c = el('circle', { cx: x, cy: y, r: 4.2, fill: col, 'fill-opacity': .9, stroke: 'rgba(0,0,0,.35)', 'stroke-width': .8 });
+        if (p[6]) c.setAttribute('stroke', '#f4c542'), c.setAttribute('stroke-width', 2.4);
+      } else if (p[2] === 'X') {
+        c = el('path', { d: 'M' + (x - 5) + ' ' + (y - 5) + 'L' + (x + 5) + ' ' + (y + 5) + 'M' + (x + 5) + ' ' + (y - 5) + 'L' + (x - 5) + ' ' + (y + 5), stroke: '#ff5a4a', 'stroke-width': 3 });
+      } else {
+        c = el('circle', { cx: x, cy: y, r: 4.6, fill: p[2] === 'C' ? '#ffffff' : 'none', stroke: p[3] ? '#f4c542' : (p[2] === 'C' ? 'rgba(0,0,0,.35)' : 'rgba(255,255,255,.85)'), 'stroke-width': p[3] ? 2.6 : 1.4 });
+      }
+      c.setAttribute('class', 'fddot');
+      var who = runs ? (p[4] || '') : (p[7] || '');
+      var t = runs ? (who + ' · ' + p[1] + ' yds · Wk ' + p[7] + ' ' + p[8]) : ((who ? who + ' · ' : '') + (p[0] != null ? p[0] + ' air yds · ' : '') + (p[2] === 'C' ? 'complete, ' + p[4] + ' yds' : p[2] === 'X' ? 'intercepted' : 'incomplete') + ' · Wk ' + p[8] + ' ' + p[9]);
+      c.appendChild(el('title', {}, t + (runs ? (p[6] ? ' · TD' : '') : (p[3] ? ' · TD' : ''))));
+      svg.appendChild(c);
+    });
+
+    /* zone labels on top of the dots */
+    zoneKeys.forEach(function (k) {
+      var z = Z[k]; if (!z) return;
+      var lane = laneX(k[1]), cx = fx((lane[0] + lane[1]) / 2);
+      var cy = runs ? fy(FMAX) + 34 : (fy(FZ[k[0]][1]) + fy(FZ[k[0]][0])) / 2;
+      var v = metric === 'share' ? pct(z.share) : metric === 'epa' ? sgn(z.epa) : metric === 'ypp' ? num(z.ypp, 1) : pct(z[metric]);
+      var rk = metric === 'share' ? z.rk_share : z['rk_' + metric];
+      var g = el('g', { class: 'fdlab' });
+      g.appendChild(el('rect', { x: cx - 44, y: cy - 24, width: 88, height: 40, rx: 5, class: 'fdlabbg' }));
+      g.appendChild(el('text', { x: cx, y: cy - 5, 'text-anchor': 'middle', class: 'fdlabv' }, v));
+      g.appendChild(el('text', { x: cx, y: cy + 11, 'text-anchor': 'middle', class: 'fdlabr' }, (rk ? '#' + rk + ' FBS' : '') + ' · ' + z.n));
+      g.addEventListener('click', function () { state.fdSel = state.fdSel === k ? null : k; drawFieldLive(); });
+      svg.appendChild(g);
+    });
+
+    host.innerHTML = '';
+    var wrap = h('div', 'fdwrap');
+    var left = h('div', 'fdfield'); left.appendChild(svg);
+    var right = h('div', 'fdside');
+    wrap.appendChild(left); wrap.appendChild(right);
+    host.appendChild(wrap);
+    drawFieldDetail(right, j, runs, side);
+    var unit = runs ? 'runs' : 'targets';
+    document.getElementById('fdNote').innerHTML = (pcFilterText() ? '<b>Filtered:</b> ' + pcFilterText() + '. ' : '') +
+      (runs ? 'Each dot is a run, placed by how many yards it gained, in the lane the play-by-play lists (left, middle, right). White = gain, red = stuffed at or behind the line, gold = 12+ yards; gold ring = touchdown. '
+            : 'Each dot is a pass target at the spot it was caught or thrown to, measured from the line of scrimmage, in the direction the play-by-play lists. Filled = complete, hollow = incomplete, red X = interception, gold ring = touchdown. Passes with no recorded spot are left off. ') +
+      'Zones are colored by ' + colorOpts[state.fdColor][1].toLowerCase() + (metric === 'share' ? '' : ' against every FBS team (blue = better' + (side === 'Defense' ? ' for the defense' : '') + ', red = worse)') +
+      '; the #rank on each zone is national, among ' + ((Z[zoneKeys[0]] || {}).pool || 'all') + ' FBS teams' + (pcFilterText() ? ' (where this filtered number would place against every team\'s full season)' : '') +
+      '. Share ranks: #1 = goes there most often. Tap a zone for every number, its national rank and the plays.';
+  }
+
+  function drawFieldDetail(host, j, runs, side) {
+    var Z = j.zones || {}, keys = runs ? ['RL', 'RM', 'RR'] : ['DL', 'DM', 'DR', 'IL', 'IM', 'IR', 'SL', 'SM', 'SR', 'BL', 'BM', 'BR'];
+    var name = function (k) { return runs ? FL[k[1]] + ' lane' : FZ[k[0]][2] + ' · ' + FL[k[1]]; };
+    var rows = runs ? [['n', 'Runs', null], ['share', 'Share of runs', 'rk_share'], ['ypp', 'Yards per carry', 'rk_ypp'], ['sr', 'Success rate', 'rk_sr'],
+                      ['epa', 'EPA per run', 'rk_epa'], ['expl', 'Explosive (12+)', 'rk_expl'], ['stuff', 'Stuffed (0 or less)', 'rk_stuff']]
+                    : [['n', 'Targets', null], ['share', 'Share of targets', 'rk_share'], ['cmp', 'Completion %', 'rk_cmp'], ['ypp', 'Yards per target', 'rk_ypp'],
+                      ['sr', 'Success rate', 'rk_sr'], ['epa', 'EPA per target', 'rk_epa'], ['expl', 'Gains of 12+', 'rk_expl']];
+    function fmtv(k, v) { if (v === null || v === undefined) return '–'; return k === 'n' ? String(v) : k === 'epa' ? sgn(v) : k === 'ypp' ? num(v, 1) : pct(v, 1); }
+    host.innerHTML = '';
+    var k = state.fdSel;
+    if (!k || !Z[k]) {
+      host.appendChild(h('h3', 'fdh', runs ? 'Every lane' : 'Every zone'));
+      var t = h('table', 'fdtab'), tr = h('tr');
+      [runs ? 'Lane' : 'Zone', runs ? 'Runs' : 'Targets', 'Share', runs ? 'YPC' : 'Comp', 'EPA'].forEach(function (x) { tr.appendChild(h('th', null, x)); });
+      var th = h('thead'); th.appendChild(tr); t.appendChild(th);
+      var tb = h('tbody');
+      keys.forEach(function (kk) {
+        var z = Z[kk]; if (!z) return;
+        var r = h('tr', 'clickable');
+        r.appendChild(h('td', 'pclab', name(kk)));
+        r.appendChild(h('td', 'nd', String(z.n)));
+        var c1 = h('td'); c1.innerHTML = pct(z.share) + ' <span class="fdrk">#' + z.rk_share + '</span>'; r.appendChild(c1);
+        var c2 = h('td'); c2.innerHTML = (runs ? num(z.ypp, 1) + ' <span class="fdrk">#' + z.rk_ypp + '</span>' : pct(z.cmp) + ' <span class="fdrk">#' + z.rk_cmp + '</span>'); r.appendChild(c2);
+        var c3 = h('td'); c3.innerHTML = sgn(z.epa) + ' <span class="fdrk">#' + z.rk_epa + '</span>'; r.appendChild(c3);
+        r.onclick = function () { state.fdSel = kk; drawFieldLive(); };
+        tb.appendChild(r);
+      });
+      t.appendChild(tb);
+      var w = h('div', 'tablewrap'); w.appendChild(t); host.appendChild(w);
+      host.appendChild(h('p', 'tblnote', '#rank = national rank among FBS teams. Tap a zone on the field or a row here for the full breakdown.'));
+      return;
+    }
+    var z = Z[k];
+    host.appendChild(h('h3', 'fdh', name(k)));
+    var t2 = h('table', 'fdtab'), tr2 = h('tr');
+    ['', state.team + (side === 'Defense' ? ' allows' : ''), 'FBS avg', 'National rank'].forEach(function (x) { tr2.appendChild(h('th', null, x)); });
+    var th2 = h('thead'); th2.appendChild(tr2); t2.appendChild(th2);
+    var tb2 = h('tbody');
+    rows.forEach(function (rw) {
+      var r = h('tr');
+      r.appendChild(h('td', 'pclab', rw[1]));
+      r.appendChild(h('td', null, fmtv(rw[0], z[rw[0]])));
+      r.appendChild(h('td', 'nd', rw[0] === 'n' ? '' : fmtv(rw[0], z.nat ? z.nat[rw[0]] : null)));
+      var rc = h('td', 'pcshade', rw[2] ? rankTxt(z[rw[2]], z.pool) : '');
+      if (rw[2] && rw[2] !== 'rk_share' && z[rw[2]] && z.pool > 1) rc.style.background = shade(1 - (z[rw[2]] - 1) / (z.pool - 1));
+      else rc.style.background = 'transparent';
+      r.appendChild(rc);
+      tb2.appendChild(r);
+    });
+    t2.appendChild(tb2);
+    var w2 = h('div', 'tablewrap'); w2.appendChild(t2); host.appendChild(w2);
+    /* who gets the ball here */
+    var list = runs ? (j.runs || []).filter(function (p) { return 'R' + p[0] === k; }) : (j.passes || []).filter(function (p) { return p[17] === k; });
+    var by = {};
+    list.forEach(function (p) { var who = runs ? p[4] : p[7]; if (!who) return; var b = by[who] = by[who] || { n: 0, y: 0, c: 0 }; b.n++; b.y += runs ? p[1] : (p[2] === 'C' ? p[4] : 0); if (!runs && p[2] === 'C') b.c++; });
+    var top = Object.keys(by).sort(function (a, b) { return by[b].n - by[a].n; }).slice(0, 5);
+    if (top.length) {
+      host.appendChild(h('p', 'fdsub', runs ? 'Who carries it here' : 'Who is targeted here'));
+      var ul = h('ul', 'fdtop');
+      top.forEach(function (n) { var b = by[n]; ul.appendChild(h('li', null, n + ' — ' + b.n + (runs ? ' carries, ' + b.y + ' yds' : ' targets, ' + b.c + ' catches, ' + b.y + ' yds'))); });
+      host.appendChild(ul);
+    }
+    var btns = h('div', 'fdbtns');
+    var open = h('button', 'pcreset', 'See all ' + list.length + ' plays');
+    open.onclick = function () { showFieldPlays(name(k), list, runs, side); };
+    var back = h('button', 'pcreset', runs ? 'All lanes' : 'All zones');
+    back.onclick = function () { state.fdSel = null; drawFieldLive(); };
+    btns.appendChild(open); btns.appendChild(back); host.appendChild(btns);
+  }
+
+  function showFieldPlays(title, list, runs, side) {
+    var dlg = document.getElementById('pcSheet'), body = document.getElementById('pcSheetBody');
+    document.getElementById('pcSheetTitle').textContent = state.team + ' ' + (side === 'Offense' ? 'offense' : 'defense') + ' · ' + title;
+    document.getElementById('pcSheetSub').textContent = pcFilterText() || (state.season + ' season, every game');
+    body.innerHTML = '';
+    var t = h('table', 'pltab'), hr = h('tr');
+    ['Wk', 'Opponent', 'Q', 'Clock', 'Down', 'Ball on', 'Score', runs ? 'Yds' : 'Air', 'Yds', 'EPA', 'Play'].forEach(function (x) { hr.appendChild(h('th', null, x)); });
+    var th = h('thead'); th.appendChild(hr); t.appendChild(th);
+    var tb = h('tbody');
+    list.slice().sort(function (a, b) { return runs ? (a[7] - b[7] || a[9] - b[9] || b[10] - a[10]) : (a[8] - b[8] || a[10] - b[10] || b[11] - a[11]); }).forEach(function (p) {
+      var ok = runs ? p[3] : p[6];
+      var r = h('tr', (side === 'Defense' ? !ok : ok) ? 'ok' : 'no');
+      var cells = runs ? [p[7], p[8], p[9] > 4 ? 'OT' : p[9], clk(p[10]), ord(p[11]) + ' & ' + p[12], ydLine(p[13], side === 'Defense'), p[15], '', p[1], sgn(p[2])]
+                       : [p[8], p[9], p[10] > 4 ? 'OT' : p[10], clk(p[11]), ord(p[12]) + ' & ' + p[13], ydLine(p[14], side === 'Defense'), p[16], p[0], p[4], sgn(p[5])];
+      cells.forEach(function (v, i) { r.appendChild(h('td', i === 1 ? 'tm' : null, v == null ? '' : String(v))); });
+      r.appendChild(h('td', 'pltext', runs ? p[14] : p[15]));
+      tb.appendChild(r);
+    });
+    t.appendChild(tb);
+    body.appendChild(h('p', 'tblnote', list.length + ' plays. ' + (side === 'Defense' ? 'Blue edge = the defense won the play; red = the offense did.' : 'Blue edge = successful play; red = unsuccessful.')));
+    var w = h('div', 'tablewrap tall'); w.appendChild(t); body.appendChild(w);
+    if (dlg.showModal) { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute('open', '');
+  }
 
   /* ---- collapsible panels ----
      Each header toggles its own panel and remembers the choice, so a reader
@@ -2406,7 +2644,7 @@
     window.__psSeason = state.season;
     buildHero(); buildRatings(); buildMarket(); buildRank(); buildAdjusted();
     buildField(); buildSit(); buildTrend(); buildPlayers(); buildLimits();
-    buildFresh(); buildH2H(); buildConf(); buildBoard(); buildPCChart(); buildTend();
+    buildFresh(); buildH2H(); buildConf(); buildBoard(); buildPCChart(); buildTend(); buildFieldLive();
     document.getElementById('loading').hidden = true;
     document.getElementById('content').hidden = false;
     wireCollapse();
