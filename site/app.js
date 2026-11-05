@@ -148,7 +148,7 @@
     'Stuffed Run (0 or less)': 'Runs stopped at or behind the line.', 'Short-Yardage Run': 'Runs on 3rd or 4th and 2 or less, as a share of runs.',
     'Red-Zone Run': 'Runs inside the opponent 20, as a share of runs.'
   };
-  var PC_NO_SR = { 'Explosive Plays': 1, 'Explosive Pass (15+)': 1, 'Explosive Run (12+)': 1, 'Stuffed Run (0 or less)': 1, 'Sacks': 1, 'Sack Rate': 1 };
+  var PC_NO_SR = { 'Negative Plays': 1, 'Explosive Plays': 1, 'Explosive Pass (15+)': 1, 'Explosive Run (12+)': 1, 'Stuffed Run (0 or less)': 1, 'Sacks': 1, 'Sack Rate': 1 };
   if (!state.pcf) state.pcf = { opp: '', last: '', fbs: false, ng: false };
   state.pcSort = state.pcSort || null; state.pcAsc = false; state.tdSide = state.tdSide || 0;
 
@@ -2505,4 +2505,71 @@
     });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+/* ---- team logos ---- */
+window.TEAM_LOGOS = {"Air Force":2005,"Akron":2006,"Alabama":333,"App State":2026,"Arizona":12,"Arizona State":9,"Arkansas":8,"Arkansas State":2032,"Army":349,"Auburn":2,"Ball State":2050,"Baylor":239,"Boise State":68,"Boston College":103,"Bowling Green":189,"Bucknell":2083,"Buffalo":2084,"BYU":252,"California":25,"Central Michigan":2117,"Charlotte":2429,"Cincinnati":2132,"Clemson":228,"Coastal Carolina":324,"Colorado":38,"Colorado State":36,"Delaware":48,"Duke":150,"East Carolina":151,"Eastern Michigan":2199,"Florida":57,"Florida Atlantic":2226,"Florida International":2229,"Florida State":52,"Fresno State":278,"Georgia":61,"Georgia Southern":290,"Georgia State":2247,"Georgia Tech":59,"Hawai'i":62,"Houston":248,"Illinois":356,"Indiana":84,"Iowa":2294,"Iowa State":66,"Jacksonville State":55,"James Madison":256,"Kansas":2305,"Kansas State":2306,"Kennesaw State":338,"Kent State":2309,"Kentucky":96,"Liberty":2335,"Louisiana":309,"Louisiana Tech":2348,"Louisville":97,"LSU":99,"Marshall":276,"Maryland":120,"Massachusetts":113,"Memphis":235,"Miami":2390,"Miami (OH)":193,"Michigan":130,"Michigan State":127,"Middle Tennessee":2393,"Minnesota":135,"Mississippi State":344,"Missouri":142,"Missouri State":2623,"Navy":2426,"NC State":152,"Nebraska":158,"Nevada":2440,"New Mexico":167,"New Mexico State":166,"North Carolina":153,"North Dakota State":2449,"North Texas":249,"Northern Illinois":2459,"Northwestern":77,"Notre Dame":87,"Ohio":195,"Ohio State":194,"Oklahoma":201,"Oklahoma State":197,"Old Dominion":295,"Ole Miss":145,"Oregon":2483,"Oregon State":204,"Penn State":213,"Pittsburgh":221,"Purdue":2509,"Rice":242,"Rutgers":164,"Sacramento State":16,"Sam Houston":2534,"San Diego State":21,"San Jos\u00e9 State":23,"SMU":2567,"South Alabama":6,"South Carolina":2579,"South Florida":58,"Southern Miss":2572,"Stanford":24,"Syracuse":183,"TCU":2628,"Temple":218,"Tennessee":2633,"Texas":251,"Texas A&M":245,"Texas State":326,"Texas Tech":2641,"Toledo":2649,"Troy":2653,"Tulane":2655,"Tulsa":202,"UAB":5,"UCF":2116,"UCLA":26,"UConn":41,"UL Monroe":2433,"UNLV":2439,"USC":30,"Utah":254,"Utah State":328,"UTEP":2638,"UTSA":2636,"Vanderbilt":238,"Virginia":258,"Virginia Tech":259,"Wake Forest":154,"Washington":264,"Washington State":265,"West Virginia":277,"Western Kentucky":98,"Western Michigan":2711,"Wisconsin":275,"Wyoming":2751};
+/* Team logos: any element whose own text starts with an exact FBS team name gets
+   that team's logo in front of it. Runs on everything the app renders, now and later,
+   so new views pick logos up without their own code. Logos: ESPN's team logo CDN
+   (CollegeFootballData team ids are ESPN ids). */
+(function () {
+  var IDS = window.TEAM_LOGOS || {};
+  var SKIP = { OPTION: 1, SELECT: 1, TEXTAREA: 1, TITLE: 1, SCRIPT: 1, STYLE: 1, INPUT: 1, svg: 1, text: 1, tspan: 1 };
+  var dark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function isDark() {
+    var t = document.documentElement.getAttribute('data-theme');
+    return t ? t === 'dark' : !!(dark && dark.matches);
+  }
+  function url(id, d) {
+    return 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/ncaa/500' + (d ? '-dark' : '') + '/' + id + '.png&h=96&w=96';
+  }
+  function decorate(el) {
+    if (SKIP[el.tagName] || el.closest('svg, select, [data-no-logo]')) return;
+    var first = el.firstChild;
+    if (!first || first.nodeType !== 3) return;
+    var name = first.nodeValue.trim();
+    var id = IDS[name];
+    if (!id) return;
+    if (first.previousSibling && first.previousSibling.classList && first.previousSibling.classList.contains('tlogo')) return;
+    if (el.firstElementChild && el.firstElementChild.classList.contains('tlogo')) return;
+    var img = document.createElement('img');
+    img.className = 'tlogo'; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+    img.width = 20; img.height = 20; img.dataset.id = id;
+    img.src = url(id, isDark());
+    img.onerror = function () {
+      if (this.dataset.fallback) { this.remove(); return; }
+      this.dataset.fallback = '1'; this.src = url(id, false);
+    };
+    el.insertBefore(img, first);
+  }
+  function scan(root) {
+    if (!root || root.nodeType !== 1) return;
+    decorate(root);
+    var all = root.getElementsByTagName('*');
+    for (var i = 0; i < all.length; i++) decorate(all[i]);
+  }
+  var pending = [], queued = false;
+  function flush() {
+    queued = false;
+    var list = pending; pending = [];
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].isConnected) scan(list[i]);
+  }
+  new MutationObserver(function (muts) {
+    for (var i = 0; i < muts.length; i++) {
+      var m = muts[i];
+      if (m.type === 'characterData') { if (m.target.parentNode) pending.push(m.target.parentNode); continue; }
+      for (var j = 0; j < m.addedNodes.length; j++) {
+        var n = m.addedNodes[j];
+        if (n.nodeType === 1 && n.classList.contains('tlogo')) continue;
+        pending.push(n.nodeType === 3 ? n.parentNode : n);
+      }
+    }
+    if (pending.length && !queued) { queued = true; requestAnimationFrame(flush); }
+  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  scan(document.body);
+  function swapTheme() {
+    var d = isDark(), imgs = document.querySelectorAll('img.tlogo');
+    for (var i = 0; i < imgs.length; i++) { imgs[i].removeAttribute('data-fallback'); imgs[i].src = url(imgs[i].dataset.id, d); }
+  }
+  if (dark && dark.addEventListener) dark.addEventListener('change', swapTheme);
 })();
