@@ -106,6 +106,7 @@ dialog::backdrop{background:rgba(10,14,22,.5)}
 .sheet .body{overflow:auto;padding:4px 16px 16px}
 .x{font:600 14px var(--body);background:var(--soft);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer}
 .pl td{white-space:normal}
+.tlogo{display:inline-block;width:1.2em;height:1.2em;max-width:56px;max-height:56px;object-fit:contain;vertical-align:-0.22em;margin-right:.4em;flex:none}
 .badge.bo{background:var(--b-soft);color:var(--b);border-color:var(--b)}
 .badge{font:600 10px var(--body);border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:1px}
 .bt{background:color-mix(in srgb,var(--gold) 20%,transparent);color:var(--gold)}
@@ -227,6 +228,73 @@ body{margin:0;padding-top:0}
 (async () => {
 const inline = document.getElementById('data');
 const D = inline && inline.textContent.trim().startsWith('{') ? JSON.parse(inline.textContent) : await (await fetch('/api/matchups-data')).json();
+window.TEAM_LOGOS = D.logos || {};
+/* Team logos: any element whose own text starts with an exact FBS team name gets
+   that team's logo in front of it. Runs on everything the app renders, now and later,
+   so new views pick logos up without their own code. Logos: ESPN's team logo CDN
+   (CollegeFootballData team ids are ESPN ids). */
+(function () {
+  var IDS = window.TEAM_LOGOS || {};
+  var SKIP = { OPTION: 1, SELECT: 1, TEXTAREA: 1, TITLE: 1, SCRIPT: 1, STYLE: 1, INPUT: 1, svg: 1, text: 1, tspan: 1 };
+  var dark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function isDark() {
+    var t = document.documentElement.getAttribute('data-theme');
+    return t ? t === 'dark' : !!(dark && dark.matches);
+  }
+  function url(id, d) {
+    return 'https://a.espncdn.com/combiner/i?img=/i/teamlogos/ncaa/500' + (d ? '-dark' : '') + '/' + id + '.png&h=96&w=96';
+  }
+  function decorate(el) {
+    if (SKIP[el.tagName] || el.closest('svg, select, [data-no-logo]')) return;
+    var first = el.firstChild;
+    if (!first || first.nodeType !== 3) return;
+    var name = first.nodeValue.trim();
+    var id = IDS[name];
+    if (!id) return;
+    if (first.previousSibling && first.previousSibling.classList && first.previousSibling.classList.contains('tlogo')) return;
+    if (el.firstElementChild && el.firstElementChild.classList.contains('tlogo')) return;
+    var img = document.createElement('img');
+    img.className = 'tlogo'; img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+    img.width = 20; img.height = 20; img.dataset.id = id;
+    img.src = url(id, isDark());
+    img.onerror = function () {
+      if (this.dataset.fallback) { this.remove(); return; }
+      this.dataset.fallback = '1'; this.src = url(id, false);
+    };
+    el.insertBefore(img, first);
+  }
+  function scan(root) {
+    if (!root || root.nodeType !== 1) return;
+    decorate(root);
+    var all = root.getElementsByTagName('*');
+    for (var i = 0; i < all.length; i++) decorate(all[i]);
+  }
+  var pending = [], queued = false;
+  function flush() {
+    queued = false;
+    var list = pending; pending = [];
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].isConnected) scan(list[i]);
+  }
+  new MutationObserver(function (muts) {
+    for (var i = 0; i < muts.length; i++) {
+      var m = muts[i];
+      if (m.type === 'characterData') { if (m.target.parentNode) pending.push(m.target.parentNode); continue; }
+      for (var j = 0; j < m.addedNodes.length; j++) {
+        var n = m.addedNodes[j];
+        if (n.nodeType === 1 && n.classList.contains('tlogo')) continue;
+        pending.push(n.nodeType === 3 ? n.parentNode : n);
+      }
+    }
+    if (pending.length && !queued) { queued = true; requestAnimationFrame(flush); }
+  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  scan(document.body);
+  function swapTheme() {
+    var d = isDark(), imgs = document.querySelectorAll('img.tlogo');
+    for (var i = 0; i < imgs.length; i++) { imgs[i].removeAttribute('data-fallback'); imgs[i].src = url(imgs[i].dataset.id, d); }
+  }
+  if (dark && dark.addEventListener) dark.addEventListener('change', swapTheme);
+})();
+
 const SV = D.services, TEAMS = Object.keys(D.teams).sort();
 const P = D.players.map(r => ({team:r[0], side:r[1], rank:r[2], pos:r[3], name:r[4], cls:r[5], st:r[6], fill:r[7], hs:r[8], grp:r[9], s:r[10], all:r[11], from:r[12], r27:r[13], leave:r[14], snaps:r[15], games:r[16], out:r[17], outWhy:r[18], orank:r[19], outKind:r[20], outSrc:r[21]}));
 const byTeam = {}; P.forEach(p => (byTeam[p.team] ??= []).push(p));

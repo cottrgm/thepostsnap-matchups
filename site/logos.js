@@ -43,7 +43,7 @@ window.TEAM_LOGOS = {"Air Force":2005,"Akron":2006,"Alabama":333,"App State":202
   function flush() {
     queued = false;
     var list = pending; pending = [];
-    for (var i = 0; i < list.length; i++) if (list[i].isConnected) scan(list[i]);
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].isConnected) scan(list[i]);
   }
   new MutationObserver(function (muts) {
     for (var i = 0; i < muts.length; i++) {
