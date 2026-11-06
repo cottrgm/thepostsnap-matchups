@@ -4239,9 +4239,9 @@
       [].forEach.call(host.querySelectorAll('tr'), function (tr) {
         var c = tr.firstChild; if (!c || c.tagName !== 'TD') return;
         var tbl0 = tr.closest('.tablewrap'), h3 = tbl0 && tbl0.previousElementSibling, team = h3 && h3.textContent;
-        var x = outs.filter(function (o) { return o.player === c.textContent && o.team === team; })[0]; if (!x) return;
+        var x = outs.filter(function (o) { return c.textContent.indexOf(o.player) === 0 && o.team === team; })[0]; if (!x || c.querySelector('.injtg')) return;
         var hit = (T[team] || []).filter(function (y) { return plSame(y.target, x.player); })[0], m = hit && hit.m;
-        if (m && m.tgts) c.appendChild(h('span', 'injrole', Math.round(m.tgts.v) + ' targets, ' + pct(m.share.v, 0) + ' of the team\'s' + (m.epa_t && m.epa_t.rk ? ' · #' + m.epa_t.rk + ' in EPA per target' : '')));
+        if (m && m.tgts) c.appendChild(h('span', 'injrole injtg', Math.round(m.tgts.v) + ' targets, ' + pct(m.share.v, 0) + ' of the team\'s' + (m.epa_t && m.epa_t.rk ? ' · #' + m.epa_t.rk + ' in EPA per target' : '')));
       });
     }).catch(function () {});
   }
@@ -4428,9 +4428,12 @@
     scGet('api/matchups-data').then(function (D) {
       top.innerHTML = ''; top.appendChild(h('h3', 'fdh', 'Next game'));
       var g = nextGame(D, f);
-      if (!g) top.appendChild(h('p', 'ax', f + ' has no game left on the schedule.'));
-      else { var home = siteName(g[2]), away = siteName(g[3]); top.appendChild(weekCard(D, g, home, away, psModel(D, home, away, !!g[4]), true)); }
-      alertsButton(top);
+      if (!g) { top.appendChild(h('p', 'ax', f + ' has no game left on the schedule.')); alertsButton(top); return; }
+      return kickoffs(g[0]).then(function (K) {
+        for (var kk in K) weekKick[kk] = K[kk];
+        var home = siteName(g[2]), away = siteName(g[3]); top.appendChild(weekCard(D, g, home, away, psModel(D, home, away, !!g[4]), true));
+        alertsButton(top);
+      });
     }).catch(function (e) { p5Fail(top, e); });
     xGet('live', { t: Math.floor(Date.now() / 60000) }).then(function (j) {
       var g = (j.games || []).filter(function (x) { return x.home === f || x.away === f; })[0];
