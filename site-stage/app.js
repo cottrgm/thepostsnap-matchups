@@ -1088,12 +1088,12 @@
       r.appendChild(h('td', 'pclab', rw[0] === 'share' ? rw[1] + ' (' + z.n + (oz2 ? ', ' + oTag + ' ' + oz2.n : '') + ' ' + (runs ? 'runs' : 'targets') + ')' : rw[1]));
       r.appendChild(h('td', null, fmtv(rw[0], z[rw[0]])));
       r.appendChild(h('td', 'nd', rw[0] === 'n' ? '' : fmtv(rw[0], z.nat ? z.nat[rw[0]] : null)));
-      var rc = h('td', 'pcshade', rw[2] ? rankTxt(z[rw[2]], z.pool) + (rw[2] === 'rk_share' ? ' most' : '') : '');
+      var rc = h('td', 'pcshade', rw[2] ? (rw[2] === 'rk_share' ? rankTxt(z[rw[2]], z.pool).replace(' of ', ' most of ') : rankTxt(z[rw[2]], z.pool)) : '');
       fdShadeRank(rc, rw[2], z[rw[2]], z.pool);
       r.appendChild(rc);
       if (oz2) {
         r.appendChild(h('td', null, fmtv(rw[0], oz2[rw[0]])));
-        var oc = h('td', 'pcshade', rw[2] ? rankTxt(oz2[rw[2]], oz2.pool) + (rw[2] === 'rk_share' ? ' most' : '') : '');
+        var oc = h('td', 'pcshade', rw[2] ? (rw[2] === 'rk_share' ? rankTxt(oz2[rw[2]], oz2.pool).replace(' of ', ' most of ') : rankTxt(oz2[rw[2]], oz2.pool)) : '');
         fdShadeRank(oc, rw[2], oz2[rw[2]], oz2.pool);
         r.appendChild(oc);
       }
