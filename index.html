@@ -366,6 +366,13 @@ function talentVal(team, side, tier, svc = S.svc, unr = S.unr){
   const r = TAL(team)[side + tier][svc]; return svc === 'ALL' ? r[unr === 'floor' ? 3 : 2] : r[unr === 'floor' ? 1 : 0];
 }
 function pctVal(team, side, tier, svc = S.svc, unr = S.unr, yr = S.yr){ const r = TAL(team, yr)[side + tier][svc]; return r[unr === 'floor' ? 3 : 2]; }
+// how a player is counted in the HS / Portal / Unrated columns: every transfer is Portal; everyone else is HS
+// if the service (any service, for All Services) rates him, otherwise Unrated
+function bucket(p, s){
+  if (p.st === 'T') return 'T';
+  const rated = s === 'ALL' ? p.s.some(x => x[2] !== 'U') : p.s[SV.indexOf(s)][2] !== 'U';
+  return rated ? 'H' : 'U';
+}
 function inTier(team, side, tier, yr = S.yr){
   const ps = (byTeam[team] || []).filter(p => p.side === side);
   return yr === 2027 ? ps.filter(p => p.r27 && p.r27 <= tier).sort((a,b) => a.r27 - b.r27) : ps.filter(p => p.st !== 'C' && p.rank <= tier);
@@ -496,9 +503,10 @@ function unitPanel(el, off, def, co, cd){
 function table(){
   const side = S.tblSide, t = S.tier, k = side + t;
   const head = `<thead><tr><th rowspan="2" class="svch">Service</th><th colspan="4" class="tmh" style="color:var(--a)">${esc(S.A)}</th><th colspan="4" class="tmh tsep" style="color:var(--b)">${esc(S.B)}</th></tr>
-    <tr><th>Avg</th><th class="cnt" title="Players with a high-school rating">HS</th><th class="cnt" title="Players with only a transfer-portal rating">Portal</th><th class="cnt" title="Players this service does not rate">Unrated</th><th class="tsep">Avg</th><th class="cnt" title="Players with a high-school rating">HS</th><th class="cnt" title="Players with only a transfer-portal rating">Portal</th><th class="cnt" title="Players this service does not rate">Unrated</th></tr></thead>`;
+    <tr><th>Avg</th><th class="cnt" title="High-school recruits this service rates">HS</th><th class="cnt" title="Every transfer in the group, whatever rating scores him">Portal</th><th class="cnt" title="High-school recruits this service does not rate">Unrated</th><th class="tsep">Avg</th><th class="cnt" title="High-school recruits this service rates">HS</th><th class="cnt" title="Every transfer in the group, whatever rating scores him">Portal</th><th class="cnt" title="High-school recruits this service does not rate">Unrated</th></tr></thead>`;
   const cells = (team, svc, sep) => {
-    const r = TAL(team)[k][svc], v = talentVal(team, side, t, svc);
+    const v = talentVal(team, side, t, svc), grp = inTier(team, side, t), r = [0, 0, 0, 0, 0, 0, 0];
+    grp.forEach(p => { const b = bucket(p, svc); r[b === 'H' ? 4 : b === 'T' ? 5 : 6]++; });
     const base = `${team}|${side}|${svc}`, dp = svc === 'Rivals' ? 2 : 1;
     let dl = '';
     if (S.yr === 2027){ const r0 = D.talent[team][k][svc], v0 = svc === 'ALL' ? r0[S.unr === 'floor' ? 3 : 2] : r0[S.unr === 'floor' ? 1 : 0];
@@ -507,7 +515,7 @@ function table(){
       <td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|H">${r[4]}</button></td><td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|T">${r[5]}</button></td><td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|U">${r[6]}</button></td>`;
   };
   const rows = ['ALL', ...SV].map(s => `<tr class="${s === 'ALL' ? 'all' : ''}"><td>${s === 'ALL' ? 'All Services (pct)' : esc(s)}</td>${cells(S.A, s, false)}${cells(S.B, s, true)}</tr>`).join('');
-  $('tbl').innerHTML = `<div class="tblwrap"><table class="svct">${head}<tbody>${rows}</tbody></table></div><p class="note">${S.yr === 2027 ? 'Projected 2027 lineup; small number = change from 2026. ' : ''}Avg counts unrated players ${S.unr === 'floor' ? 'at the 2-star floor' : 'as excluded'}. Portal = only a transfer-portal rating exists, counted at a ${Math.round(D.discount*100)}% discount above the floor.</p>`;
+  $('tbl').innerHTML = `<div class="tblwrap"><table class="svct">${head}<tbody>${rows}</tbody></table></div><p class="note">${S.yr === 2027 ? 'Projected 2027 lineup; small number = change from 2026. ' : ''}Avg counts unrated players ${S.unr === 'floor' ? 'at the 2-star floor' : 'as excluded'}. HS = high-school recruits the service rates; Portal = every transfer in the group; Unrated = high-school recruits the service does not rate. A transfer with no high-school rating is scored on his portal rating, at a ${Math.round(D.discount*100)}% discount above the floor.</p>`;
 }
 
 function stars(n){ return n ? `<span class="stars">${'★'.repeat(n)}</span>` : ''; }
@@ -679,10 +687,8 @@ function openSheet(key){
   }
   if (kind === 'basis'){
     const [, team, side, s, b] = parts; svc = s;
-    ps = inTier(team, side, t).filter(p => s === 'ALL'
-      ? (b === 'H' ? p.s.some(x => x[2] === 'H') : b === 'T' ? !p.s.some(x => x[2] === 'H') && p.s.some(x => x[2] === 'T') : p.s.every(x => x[2] === 'U'))
-      : p.s[SV.indexOf(s)][2] === b);
-    title = `${team}: ${b === 'H' ? 'high-school rated' : b === 'T' ? 'portal-only rating' : 'unrated'}`;
+    ps = inTier(team, side, t).filter(p => bucket(p, s) === b);
+    title = `${team}: ${b === 'H' ? 'high-school recruits, rated' : b === 'T' ? 'transfers' : 'high-school recruits, unrated'}`;
     sub = `Top ${t} ${side === 'O' ? 'offense' : 'defense'} · ${s === 'ALL' ? 'any service' : s} · ${ps.length} players`;
   }
   $('shTitle').textContent = title; $('shSub').textContent = sub;
