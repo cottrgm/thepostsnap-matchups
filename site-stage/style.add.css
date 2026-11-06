@@ -1,9 +1,0 @@
-
-/* ---- round 7: injury reports, QB compare ---- */
-.injst.out, .injst.season { color: var(--s2); font-weight: 600; }
-.injst.doubtful { color: var(--s2); }
-.injst.questionable { color: var(--gold, var(--ink-2)); font-weight: 600; }
-.injst.probable, .injst.available { color: var(--muted); }
-.qbcmp { margin: 16px 0 6px; display: grid; gap: 8px; }
-.qbcmp select { max-width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); color: var(--ink); }
-.qbwin { font-weight: 700; color: var(--ink); background: color-mix(in srgb, var(--s1) 12%, transparent); }
