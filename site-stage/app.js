@@ -5562,13 +5562,13 @@
     var sideHost = document.getElementById('leagueSideTabs');
     if (v.sided) {
       segs(sideHost, ['Offense', 'Defense'], vstate.leagueSide,
-        function (i) { vstate.leagueSide = i; buildLeague(); });
+        function (i) { vstate.leagueSide = i; vstate.leagueSort = null; buildLeague(); });
     } else { sideHost.innerHTML = ''; }
 
     document.getElementById('leagueTitle').textContent = v.label;
     document.getElementById('leagueLede').textContent = v.lede;
     document.getElementById('leagueEyebrow').textContent = state.season + ' season';
-    if (!vstate.leagueSort) { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || ((v.id === 'adjusted' || v.id === 'halves') && vstate.leagueSide === 1)); }
+    if (!vstate.leagueSort) { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || ((v.id === 'adjusted' || v.id === 'halves' || v.id === 'five-factors') && vstate.leagueSide === 1)); }
 
     var key = v.id + '|' + state.season + '|' + (v.sided ? side : '');
     var tb = document.getElementById('leagueTable');
@@ -5649,7 +5649,7 @@
         host: tb, cols: cols, rows: rows, sortKey: vstate.leagueSort, asc: vstate.leagueAsc,
         rowClass: function (r) { return r.team === state.team ? 'me' : ''; },
         onSort: function (kk, isNum) {
-          if (kk === '_pos') { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || ((v.id === 'adjusted' || v.id === 'halves') && vstate.leagueSide === 1)); buildLeague(); return; }
+          if (kk === '_pos') { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || ((v.id === 'adjusted' || v.id === 'halves' || v.id === 'five-factors') && vstate.leagueSide === 1)); buildLeague(); return; }
           if (vstate.leagueSort === kk) vstate.leagueAsc = !vstate.leagueAsc;
           else { vstate.leagueSort = kk; vstate.leagueAsc = !isNum || (v.id === 'pace' && kk.indexOf('sec_') === 0); }
           buildLeague();
@@ -5662,7 +5662,7 @@
           + dropped + '</b> ' + (dropped === 1 ? 'team is' : 'teams are') + ' held back this season for a thin sample rather than being ranked off a handful of gaps.'
         : v.id === 'sos'
           ? 'Opponent strength is SP+, so the scale is points against an average team. A blank remaining column means the schedule is finished.'
-          : 'Drives are reconstructed from the play log because the feed has no drive endpoint, so field position and points per opportunity are computed here rather than supplied. On the defensive view every column is read the other way: a low number is a good defense.';
+          : v.id !== 'five-factors' ? '' : 'Drives are reconstructed from the play log because the feed has no drive endpoint, so field position and points per opportunity are computed here rather than supplied. On the defensive view every column is read the other way: a low number is a good defense.';
     }
   }
 
