@@ -94,6 +94,11 @@ button:focus-visible,select:focus-visible,.tap:focus-visible{outline:3px solid v
 table{border-collapse:collapse;width:100%;font-size:13.5px}
 th{font:500 11px var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
+table.svct th.tmh{text-align:center;border-bottom:1px solid var(--line)}
+table.svct th.svch{vertical-align:bottom}
+table.svct th.cnt,table.svct td.cnt{text-align:center;width:9%}
+table.svct .tsep{border-left:1px solid var(--line);padding-left:14px}
+table.svct td .dl{margin-left:6px}
 td{padding:6px 8px;border-bottom:1px solid var(--soft);text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 td:first-child{font-family:var(--body);font-weight:500}
 tr.all td{font-weight:600;background:var(--soft)}
@@ -300,12 +305,13 @@ window.TEAM_LOGOS = D.logos || {};
 const SV = D.services, TEAMS = Object.keys(D.teams).sort();
 const P = D.players.map(r => ({team:r[0], side:r[1], rank:r[2], pos:r[3], name:r[4], cls:r[5], st:r[6], fill:r[7], hs:r[8], grp:r[9], s:r[10], all:r[11], from:r[12], r27:r[13], leave:r[14], snaps:r[15], games:r[16], out:r[17], outWhy:r[18], orank:r[19], outKind:r[20], outSrc:r[21]}));
 const byTeam = {}; P.forEach(p => (byTeam[p.team] ??= []).push(p));
-const S = {schTeam:'A', clsScope:'conf', clsSort:'d', yr:2026, A:'Auburn', B:'Alabama', site:'N', tier:22, svc:'ALL', unr:'floor', tblSide:'O', rosTeam:'A'};
+const S = {schTeam:'A', clsScope:'conf', clsSort:'sc', yr:2026, A:'Auburn', B:'Alabama', site:'N', tier:22, svc:'ALL', unr:'floor', tblSide:'O', rosTeam:'A'};
 try { Object.assign(S, JSON.parse(localStorage.getItem('fbsMatchup') || '{}')); } catch(e) {}
 // saved settings from older versions: only 11/22/33 exist now, and teams must still be on the board
 if (![11, 22, 33].includes(Number(S.tier))) S.tier = 22;
 if (!D.teams[S.A]) S.A = 'Auburn'; if (!D.teams[S.B]) S.B = 'Alabama';
-if (!['d','avg','cur','nr','team'].includes(S.clsSort)) S.clsSort = 'd';
+if (!['sc','d','avg','cur','nr','team'].includes(S.clsSort)) S.clsSort = 'sc';
+if (S.clsV !== 2) { S.clsSort = 'sc'; S.clsSortDir = undefined; S.clsV = 2; }
 let saved = false; try { saved = !!localStorage.getItem('fbsMatchup'); } catch(e) {}
 if (!D.teams[S.A]) S.A = 'Auburn'; if (!D.teams[S.B]) S.B = 'Alabama';
 if (!saved){ const nx = D.schedule.filter(g => g[2] === 'Auburn' || g[3] === 'Auburn').sort((a,b) => a[0]-b[0])[0]; if (nx){ S.A = 'Auburn'; S.B = nx[2] === 'Auburn' ? nx[3] : nx[2]; S.site = nx[4] ? 'N' : (nx[2] === 'Auburn' ? 'A' : 'B'); } }
@@ -468,19 +474,19 @@ function unitPanel(el, off, def, co, cd){
 
 function table(){
   const side = S.tblSide, t = S.tier, k = side + t;
-  const head = `<tr><th>Service</th><th colspan="2" style="text-align:center;color:var(--a)">${esc(S.A)}</th><th colspan="2" style="text-align:center;color:var(--b)">${esc(S.B)}</th></tr>
-    <tr><th></th><th>Avg</th><th>HS · Portal · Unrated</th><th>Avg</th><th>HS · Portal · Unrated</th></tr>`;
-  const cells = (team, svc) => {
+  const head = `<thead><tr><th rowspan="2" class="svch">Service</th><th colspan="4" class="tmh" style="color:var(--a)">${esc(S.A)}</th><th colspan="4" class="tmh tsep" style="color:var(--b)">${esc(S.B)}</th></tr>
+    <tr><th>Avg</th><th class="cnt" title="Players with a high-school rating">HS</th><th class="cnt" title="Players with only a transfer-portal rating">Portal</th><th class="cnt" title="Players this service does not rate">Unrated</th><th class="tsep">Avg</th><th class="cnt" title="Players with a high-school rating">HS</th><th class="cnt" title="Players with only a transfer-portal rating">Portal</th><th class="cnt" title="Players this service does not rate">Unrated</th></tr></thead>`;
+  const cells = (team, svc, sep) => {
     const r = TAL(team)[k][svc], v = talentVal(team, side, t, svc);
     const base = `${team}|${side}|${svc}`, dp = svc === 'Rivals' ? 2 : 1;
     let dl = '';
     if (S.yr === 2027){ const r0 = D.talent[team][k][svc], v0 = svc === 'ALL' ? r0[S.unr === 'floor' ? 3 : 2] : r0[S.unr === 'floor' ? 1 : 0];
       if (v != null && v0 != null) { const d = v - v0; dl = `<span class="dl ${d > 0.05 ? 'up' : d < -0.05 ? 'dn' : ''}">${sgn(d, dp)}</span>`; } }
-    return `<td><button class="tap" type="button" data-k="svc|${esc(base)}">${fmt(v, dp)}</button>${dl}</td>
-      <td><button class="tap" type="button" data-k="basis|${esc(base)}|H">${r[4]}</button> · <button class="tap" type="button" data-k="basis|${esc(base)}|T">${r[5]}</button> · <button class="tap" type="button" data-k="basis|${esc(base)}|U">${r[6]}</button></td>`;
+    return `<td class="${sep ? 'tsep' : ''}"><button class="tap" type="button" data-k="svc|${esc(base)}">${fmt(v, dp)}</button>${dl}</td>
+      <td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|H">${r[4]}</button></td><td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|T">${r[5]}</button></td><td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|U">${r[6]}</button></td>`;
   };
-  const rows = ['ALL', ...SV].map(s => `<tr class="${s === 'ALL' ? 'all' : ''}"><td>${s === 'ALL' ? 'All Services (pct)' : esc(s)}</td>${cells(S.A, s)}${cells(S.B, s)}</tr>`).join('');
-  $('tbl').innerHTML = `<table>${head}${rows}</table><p class="note">${S.yr === 2027 ? 'Projected 2027 lineup; small number = change from 2026. ' : ''}Avg counts unrated players ${S.unr === 'floor' ? 'at the 2-star floor' : 'as excluded'}. Portal = only a transfer-portal rating exists, counted at a ${Math.round(D.discount*100)}% discount above the floor.</p>`;
+  const rows = ['ALL', ...SV].map(s => `<tr class="${s === 'ALL' ? 'all' : ''}"><td>${s === 'ALL' ? 'All Services (pct)' : esc(s)}</td>${cells(S.A, s, false)}${cells(S.B, s, true)}</tr>`).join('');
+  $('tbl').innerHTML = `<div class="tblwrap"><table class="svct">${head}<tbody>${rows}</tbody></table></div><p class="note">${S.yr === 2027 ? 'Projected 2027 lineup; small number = change from 2026. ' : ''}Avg counts unrated players ${S.unr === 'floor' ? 'at the 2-star floor' : 'as excluded'}. Portal = only a transfer-portal rating exists, counted at a ${Math.round(D.discount*100)}% discount above the floor.</p>`;
 }
 
 function stars(n){ return n ? `<span class="stars">${'★'.repeat(n)}</span>` : ''; }
@@ -592,31 +598,38 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-opp]
 function classImpact(){
   const svcIdx = S.svc === 'ALL' ? -1 : SV.indexOf(S.svc);
   const score = p => svcIdx < 0 ? p.all : (p.s[svcIdx][2] === 'U' ? null : p.s[svcIdx][0]);
+  // class score: every rated commit's percentile, best first, weighted so the top of the class counts most
+  // (the same bell-curve weighting the recruiting sites use for team rankings), scaled so a full class of
+  // players at the Nth percentile scores about N. Unlike a plain average, a 4-man class can't outrank a 25-man one.
+  const pctOf = p => svcIdx < 0 ? p.all : (p.s[svcIdx][2] === 'U' ? null : p.s[svcIdx][3]);
+  const CW = Array.from({length: 40}, (_, i) => Math.exp(-((i / 6) ** 2))), CW25 = CW.slice(0, 25).reduce((a, b) => a + b, 0);
   const rows = TEAMS.map(team => {
     const cls = (byTeam[team] || []).filter(p => p.st === 'C'), vals = cls.map(score).filter(v => v != null);
     const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
     const o = talentVal(team, 'O', 33, S.svc, 'excl'), d = talentVal(team, 'D', 33, S.svc, 'excl');
     const cur = o != null && d != null ? (o + d) / 2 : null;
-    return {team, conf: D.teams[team].conf, n: cls.length, nr: vals.length, avg, cur, d: avg != null && cur != null ? avg - cur : null};
+    const pv = cls.map(pctOf).filter(v => v != null).sort((a, b) => b - a);
+    const sc = pv.length ? pv.reduce((a, v, i) => a + v * (CW[i] || 0), 0) / CW25 : null;
+    return {team, conf: D.teams[team].conf, n: cls.length, nr: vals.length, avg, cur, sc, d: avg != null && cur != null ? avg - cur : null};
   }).filter(r => r.avg != null && r.cur != null);
   const rankBy = (key) => { for (const r of rows) r[key + 'Rk'] = 1 + rows.filter(x => x[key] > r[key]).length; };
-  rankBy('avg'); rankBy('d'); rankBy('cur');
+  rankBy('avg'); rankBy('d'); rankBy('cur'); rankBy('sc');
   // the sortable metrics; '#' always shows the national rank on whichever metric the table is sorted by
-  const cols = {d: [-1, 'Impact', 'dRk'], avg: [-1, 'Class avg', 'avgRk'], cur: [-1, 'Current top 33', 'curRk'], nr: [-1, 'Rated commits', null], team: [1, 'Team', null]};
-  if (!cols[S.clsSort]) S.clsSort = 'd';
+  const cols = {sc: [-1, 'Class rank score', 'scRk'], d: [-1, 'Impact', 'dRk'], avg: [-1, 'Class avg', 'avgRk'], cur: [-1, 'Current top 33', 'curRk'], nr: [-1, 'Rated commits', null], team: [1, 'Team', null]};
+  if (!cols[S.clsSort]) S.clsSort = 'sc';
   const dir = S.clsSortDir ?? cols[S.clsSort][0];
   const val = r => S.clsSort === 'team' ? r.team : r[S.clsSort];
   rows.sort((a, b) => { const x = val(a), y = val(b); const c = typeof x === 'string' ? x.localeCompare(y) : (x - y); return dir * c || a.team.localeCompare(b.team); });
-  const rkKey = cols[S.clsSort][2] || 'dRk';
+  const rkKey = cols[S.clsSort][2] || 'scRk';
   const confs = new Set([D.teams[S.A].conf, D.teams[S.B].conf]);
   const show = S.clsScope === 'all' ? rows : rows.filter(r => confs.has(r.conf));
   const dp = S.svc === 'Rivals' ? 2 : 1;
   const th = (key, align) => { const on = S.clsSort === key; const arrow = on ? (dir > 0 ? ' ▲' : ' ▼') : '';
     return `<th style="${align ? 'text-align:left;' : ''}cursor:pointer;white-space:nowrap${on ? ';color:var(--ink)' : ''}" data-cls-sort="${key}" aria-sort="${on ? (dir > 0 ? 'ascending' : 'descending') : 'none'}">${cols[key][1]}${arrow}</th>`; };
   const rk = n => `<span class="note">#${n}</span>`;
-  $('classes').innerHTML = `<table><tr><th style="text-align:left" title="National rank on the sorted column">#</th>${th('team', 1)}${th('d')}${th('avg')}${th('cur')}${th('nr')}</tr>${show.map(r => `<tr style="${r.team === S.A ? 'background:var(--a-soft)' : r.team === S.B ? 'background:var(--b-soft)' : ''}"><td style="text-align:left;font-family:var(--mono)">${r[rkKey]}</td><td style="text-align:left;font-family:var(--body)">${esc(r.team)} <span class="note">${esc(r.conf)}</span></td><td><span class="dl ${r.d > 0 ? 'up' : 'dn'}" style="font-size:13px">${sgn(r.d, dp)}</span> ${rk(r.dRk)}</td><td>${fmt(r.avg, dp)} ${rk(r.avgRk)}</td><td>${fmt(r.cur, dp)} ${rk(r.curRk)}</td><td><button class="tap" type="button" data-k="class|${esc(r.team)}">${r.nr}</button>${r.n > r.nr ? `<span class="note"> of ${r.n}</span>` : ''}</td></tr>`).join('')}</table>`;
+  $('classes').innerHTML = `<table><tr><th style="text-align:left" title="National rank on the sorted column">#</th>${th('team', 1)}${th('sc')}${th('d')}${th('avg')}${th('cur')}${th('nr')}</tr>${show.map(r => `<tr style="${r.team === S.A ? 'background:var(--a-soft)' : r.team === S.B ? 'background:var(--b-soft)' : ''}"><td style="text-align:left;font-family:var(--mono)">${r[rkKey]}</td><td style="text-align:left;font-family:var(--body)">${esc(r.team)} <span class="note">${esc(r.conf)}</span></td><td>${fmt(r.sc, 1)} ${rk(r.scRk)}</td><td><span class="dl ${r.d > 0 ? 'up' : 'dn'}" style="font-size:13px">${sgn(r.d, dp)}</span> ${rk(r.dRk)}</td><td>${fmt(r.avg, dp)} ${rk(r.avgRk)}</td><td>${fmt(r.cur, dp)} ${rk(r.curRk)}</td><td><button class="tap" type="button" data-k="class|${esc(r.team)}">${r.nr}</button>${r.n > r.nr ? `<span class="note"> of ${r.n}</span>` : ''}</td></tr>`).join('')}</table>`;
   const unit = S.svc === 'ALL' ? 'All Services percentile (0-100, each service\'s rating converted to a percentile of its high-school pool, then averaged)' : `${S.svc} rating`;
-  $('clsNote').innerHTML = `<b>Impact</b> = class avg minus current top 33; positive means the incoming class is better than the players it joins. <b>Class avg</b> = average ${unit} of the school's rated 2027 commits. <b>Current top 33</b> = average of the 33 most-snapped available players on offense and on defense this season, same scale, unrated excluded. <b>Rated commits</b> = committed 2027 signees this service rates (tap to see them; "of N" = all commits). Small <b>#</b> = national rank on that column among ${rows.length} FBS teams; the first column is the rank on whichever column is sorted. Tap a column heading to sort. Classes are not final until signing day.`;
+  $('clsNote').innerHTML = `<b>Class rank score</b> = how the class ranks as a whole, the way the recruiting sites rank team classes: every rated commit's ${S.svc === 'ALL' ? 'All Services' : esc(S.svc)} percentile, best first, with the top of the class weighted most, scaled so a full 25-man class of Nth-percentile players scores about N. It rewards size and quality together, so a small elite class does not outrank a full one. This is the default sort. <b>Impact</b> = class avg minus current top 33; positive means the incoming class is better than the players it joins. <b>Class avg</b> = average ${unit} of the school's rated 2027 commits. <b>Current top 33</b> = average of the 33 most-snapped available players on offense and on defense this season, same scale, unrated excluded. <b>Rated commits</b> = committed 2027 signees this service rates (tap to see them; "of N" = all commits). Small <b>#</b> = national rank on that column among ${rows.length} FBS teams; the first column is the rank on whichever column is sorted. Tap a column heading to sort. Classes are not final until signing day.`;
 }
 document.addEventListener('click', e => { const h = e.target.closest('[data-cls-sort]'); if (!h) return; const k = h.dataset.clsSort;
   if (S.clsSort === k) S.clsSortDir = -(S.clsSortDir ?? (k === 'team' ? 1 : -1)); else { S.clsSort = k; S.clsSortDir = undefined; }
