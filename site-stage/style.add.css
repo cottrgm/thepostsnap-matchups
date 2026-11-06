@@ -1,0 +1,41 @@
+
+/* ---------- phase 5d ---------- */
+.pcv small{display:block;font-size:11px;color:var(--muted);font-weight:400;line-height:1.2}
+.pcb.tdb{background:color-mix(in srgb, var(--muted) 30%, transparent)}
+.lvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin:4px 0 16px}
+.lvcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface-1);display:flex;flex-direction:column;gap:5px;min-width:0}
+.lvcard.on{border-color:var(--s1);box-shadow:inset 3px 0 0 var(--s1)}
+.lvwhen{margin:0;font:600 12px "IBM Plex Sans Condensed",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lvrow{display:flex;justify-content:space-between;align-items:baseline;font-size:16px;color:var(--ink-2)}
+.lvrow.lead{color:var(--ink);font-weight:700}
+.lvpts{font-variant-numeric:tabular-nums;font-size:20px}
+.lvposs{color:var(--s1);font-size:12px}
+.lvwp{height:6px;border-radius:3px;background:var(--s1);overflow:hidden;margin-top:4px}
+.lvwp span{display:block;height:100%;background:color-mix(in srgb, var(--muted) 45%, transparent)}
+.lvwpt,.lvsit{margin:0;font-size:12.5px;color:var(--muted)}
+.lvlast{margin:0;font-size:13px;color:var(--ink-2);line-height:1.4}
+.lvcard .navlink{align-self:flex-start}
+.whatif{margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-1)}
+.wihead p{margin:2px 0 8px}
+.wilist{display:flex;flex-direction:column;gap:6px;margin:8px 0 6px}
+.wirow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.wiwk{font:600 11.5px "IBM Plex Sans Condensed",sans-serif;letter-spacing:.08em;color:var(--muted);min-width:44px}
+.wibtn{min-height:34px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-1);color:var(--ink-2);font:500 13.5px "IBM Plex Sans",sans-serif;cursor:pointer}
+.wibtn.mid{color:var(--muted);font-size:12px}
+.wibtn.on{background:var(--ink);color:var(--surface-1);border-color:var(--ink)}
+.wicount{font-size:13px;color:var(--muted);align-self:center}
+.wimodel{font-size:12.5px;color:var(--muted)}
+.wiflag{margin:0 0 8px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb, var(--s1) 12%, transparent);color:var(--ink);font-size:13.5px}
+.widelta{font-size:11.5px;font-weight:700}.widelta.up{color:#1f8a4c}.widelta.dn{color:#c0392b}
+.cmpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:10px 0 12px}
+.cmpcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-1);display:flex;flex-direction:column;gap:3px;min-width:0}
+.cmprk{margin:0;font:600 11px "IBM Plex Sans Condensed",sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.cmpteam{margin:0;font-size:17px;font-weight:700;color:var(--ink)}
+.cmpsub,.cmpdist{margin:0;font-size:12.5px;color:var(--ink-2)}.cmpdist{color:var(--muted)}
+.cmpcard .navlink{align-self:flex-start;margin-top:4px}
+.zbar{position:relative;display:inline-block;width:110px;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--line),var(--line));vertical-align:middle;margin-right:8px}
+.zbar::after{content:"";position:absolute;left:50%;top:-3px;width:1px;height:14px;background:var(--muted)}
+.zbar i{position:absolute;top:-2px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--s1)}
+.portalcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.portalcol{min-width:0}
+.tile .v.resttxt{font-size:13px;line-height:1.3}
