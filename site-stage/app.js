@@ -3942,7 +3942,7 @@
       e.preventDefault();
       var msg = document.getElementById('nlMsg'), em = document.getElementById('nlEmail').value;
       msg.textContent = 'Saving…';
-      fetch('api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: em, team: state.team || '' }) })
+      fetch('https://zrlbloresudxvdhryzjn.supabase.co/functions/v1/postsnap/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: em, team: state.team || '' }) })
         .then(function (r) { return r.json(); })
         .then(function (j) { msg.textContent = j.ok ? 'Thanks — you are on the list. The first email goes out when the newsletter launches.' : (j.error || 'Could not save that.'); if (j.ok) f.reset(); })
         .catch(function () { msg.textContent = 'Could not save that. Try again in a minute.'; });
