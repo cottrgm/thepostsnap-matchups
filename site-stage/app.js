@@ -2837,7 +2837,7 @@
     p5Cards(host, [
       ['Rushers per dropback', num(T.rushers, 2), 'FBS average ' + num(N.rushers, 2)],
       ['Blitzers per dropback', num(T.blitzers, 2), rk(T.blitz_rk, T.pool) + ' most · FBS ' + num(N.blitzers, 2)],
-      ['Pressures credited per dropback', pct(T.prate, 0), rk(T.prate_rk, T.pool) + ' · FBS ' + pct(N.prate, 0), T.prate_rk, T.pool],
+      ['Sacks per dropback', (j.dprofile || {}).sack_rate != null ? pct(j.dprofile.sack_rate, 1) : '–', rk((j.dprofile || {}).rk, (j.dprofile || {}).pool) + ' · play-by-play', (j.dprofile || {}).rk, (j.dprofile || {}).pool],
       ['Pressure per rush snap', pct(T.win, 1), rk(T.win_rk, T.pool) + ' · FBS ' + pct(N.win, 1), T.win_rk, T.pool]
     ]);
     var W = 760, H = 330, d = isDarkTheme();
@@ -2895,7 +2895,7 @@
     p5Cards(host, [
       ['Offensive line, pass blocking', num(O.pbg, 1), 'PFF grade · ' + rk(O.pbg_rk, O.pool), O.pbg_rk, O.pool],
       ['Offensive line, run blocking', num(O.rbg, 1), 'PFF grade · ' + rk(O.rbg_rk, O.pool), O.rbg_rk, O.pool],
-      ['Sacks per dropback', pct(P.sack_rate, 1), 'from the play-by-play']
+      ['Sacks allowed per dropback', pct(P.sack_rate, 1), rk(P.rk, P.pool) + ' (#1 = fewest) · play-by-play', P.rk, P.pool]
     ]);
     var X = tbl(['Lineman', 'Pos', 'Pass-block snaps', 'Pass-block grade', 'Run-block snaps', 'Run-block grade']);
     (j.blockers || []).forEach(function (b) {
@@ -3109,8 +3109,10 @@
         tr.appendChild(td(null, FZ[zk[0]][2].replace(/ \(.*/, '') + ' ' + FL[zk[1]].toLowerCase() + ' (' + pct(b.z[zk] / b.n, 0) + ')'));
         var c = h('td', 'pcshade');
         if (dz) {
-          c.innerHTML = sgn(dz.epa, 2) + ' EPA <span class="fdrk">#' + dz.rk_epa + '</span>' + (dz.rk_epa > dz.pool * 0.66 ? ' <span class="sittag good">soft spot</span>' : dz.rk_epa <= dz.pool * 0.2 ? ' <span class="sittag bad">strength</span>' : '');
-          c.style.background = shade(1 - (dz.pool - dz.rk_epa) / Math.max(1, dz.pool - 1));
+          var big = dz.n >= 20;
+          c.innerHTML = sgn(dz.epa, 2) + ' EPA <span class="fdrk">#' + dz.rk_epa + ' · ' + dz.n + ' tgts</span>' +
+            (!big ? ' <span class="sittag">small sample</span>' : dz.rk_epa > dz.pool * 0.66 ? ' <span class="sittag good">soft spot</span>' : dz.rk_epa <= dz.pool * 0.2 ? ' <span class="sittag bad">strength</span>' : '');
+          c.style.background = big ? shade(1 - (dz.pool - dz.rk_epa) / Math.max(1, dz.pool - 1)) : 'transparent';
         } else c.textContent = '–';
         tr.appendChild(c); X.tb.appendChild(tr);
       });
@@ -3123,20 +3125,25 @@
       var tr = h('tr'); tr.appendChild(td('pclab', FL[k[1]])); tr.appendChild(td('nd', pct(o.share, 0) + ' (' + o.n + ')'));
       tr.appendChild(td('nd', num(o.ypp, 1))); tr.appendChild(td('nd', sgn(o.epa, 2)));
       var c = h('td', 'pcshade');
-      if (dz) { c.innerHTML = num(dz.ypp, 1) + ' YPC, ' + sgn(dz.epa, 2) + ' EPA <span class="fdrk">#' + dz.rk_epa + '</span>'; c.style.background = shade(1 - (dz.pool - dz.rk_epa) / Math.max(1, dz.pool - 1)); } else c.textContent = '–';
+      if (dz) { c.innerHTML = num(dz.ypp, 1) + ' YPC, ' + sgn(dz.epa, 2) + ' EPA <span class="fdrk">#' + dz.rk_epa + ' · ' + dz.n + ' runs</span>'; c.style.background = shade(1 - (dz.pool - dz.rk_epa) / Math.max(1, dz.pool - 1)); } else c.textContent = '–';
       tr.appendChild(c); R.tb.appendChild(tr);
     });
     host.appendChild(R.wrap);
     host.appendChild(h('h3', 'fdh', off + '\'s protection against ' + def + '\'s pass rush'));
     var ol = PO.ol || {}, pr = PD.team || {};
     var P = tbl(['', off + ' offense', def + ' defense']);
-    [['Pass blocking / pass rush (PFF)', ol.pbg != null ? num(ol.pbg, 1) + ' grade, ' + rk(ol.pbg_rk, ol.pool) : '–', pr.prate != null ? pct(pr.prate, 0) + ' pressures credited per dropback, ' + rk(pr.prate_rk, pr.pool) : '–'],
-     ['Sacks', PO.profile && PO.profile.sack_rate != null ? pct(PO.profile.sack_rate, 1) + ' of dropbacks' : '–', pr.sk != null ? num(pr.sk, 0) + ' sacks' : '–'],
-     ['Blitzing', '', pr.blitzers != null ? num(pr.blitzers, 2) + ' blitzers per dropback, ' + rk(pr.blitz_rk, pr.pool) + ' most' : '–']].forEach(function (row) {
-      var tr = h('tr'); row.forEach(function (v, i) { tr.appendChild(td(i ? 'nd' : 'pclab', v)); }); P.tb.appendChild(tr);
+    var op = PO.profile || {}, dp = PD.dprofile || {};
+    function pcell(txt, r, pool) { var c = h('td', 'pcshade', txt); c.style.background = r ? xRankBg(r, pool) : 'transparent'; return c; }
+    [['Sack rate', op.sack_rate != null ? pct(op.sack_rate, 1) + ' of dropbacks · ' + rk(op.rk, op.pool) : '–', op.rk, op.pool,
+       dp.sack_rate != null ? pct(dp.sack_rate, 1) + ' of dropbacks · ' + rk(dp.rk, dp.pool) : '–', dp.rk, dp.pool],
+     ['Line against the rush (PFF)', ol.pbg != null ? num(ol.pbg, 1) + ' pass-block grade · ' + rk(ol.pbg_rk, ol.pool) : '–', ol.pbg_rk, ol.pool,
+       pr.win != null ? pct(pr.win, 1) + ' pressure per rush snap · ' + rk(pr.win_rk, pr.pool) : '–', pr.win_rk, pr.pool],
+     ['Blitzing (PFF)', '', null, null, pr.blitzers != null ? num(pr.blitzers, 2) + ' blitzers per dropback · ' + rk(pr.blitz_rk, pr.pool) + ' most' : '–', null, null]].forEach(function (row) {
+      var tr = h('tr'); tr.appendChild(td('pclab', row[0])); tr.appendChild(pcell(row[1], row[2], row[3])); tr.appendChild(pcell(row[4], row[5], row[6])); P.tb.appendChild(tr);
     });
     host.appendChild(P.wrap);
-    host.appendChild(h('p', 'tblnote', 'Zone and lane numbers are season to date. "' + def + ' allows there" ranks the defense nationally in that spot (#1 = toughest); soft spot = bottom third, strength = top fifth. Colors are from ' + off + '\'s side: blue = favorable for the offense, red = a tough spot. Protection and pass rush come from PFF charting.'));
+    host.appendChild(h('p', 'tblnote', 'Zone and lane numbers are season to date. "' + def + ' allows there" ranks the defense nationally in that spot (#1 = toughest); soft spot = bottom third, strength = top fifth. Colors are from ' + off + '\'s side: blue = favorable for the offense, red = a tough spot. Sack rates come from the play-by-play (#1 = fewest allowed on offense, most forced on defense); line grades, pressure per rush snap and blitzing come from PFF charting. Shading: blue = among the best in the country for that unit.'));
+    [].forEach.call(host.querySelectorAll('table'), function (t) { t.classList.add('kmtab'); });
   }
   function scSitu(host, off, def, O, Dd) {
     host.innerHTML = '';
@@ -3870,7 +3877,7 @@
     ['sr_run', 'Run success rate', 'p1', 1], ['epa_run', 'EPA per run', 's2', 1], ['stuff_rate', 'Runs stuffed at or behind the line', 'p1', -1],
     ['sr_pass', 'Dropback success rate', 'p1', 1], ['epa_pass', 'EPA per dropback', 's2', 1], ['explosive_pass_rate', 'Explosive pass rate', 'p1', 1],
     ['sr_standard', 'Success on standard downs', 'p1', 1], ['sr_passdown', 'Success on passing downs', 'p1', 1], ['sr_redzone', 'Red-zone success rate', 'p1', 1],
-    ['pass_rate', 'Pass rate', 'p0', 0], ['plays_per_game', 'Plays per game', 'n1', 0]
+    ['pass_rate', 'Pass rate (defense: what it faces)', 'p0', 0], ['plays_per_game', 'Plays per game (defense: snaps faced)', 'n1', 0]
   ];
   var SC_EXTRA = ['ppd', 'three_out', 'third_conv', 'rz_td', 'to_rate', 'pressure_rate', 'sack_rate', 'opp_rate', 'tfl_rate', 'yac_per_catch'];
   var SC_ZROWS = [['D', 'Deep 20+'], ['I', '10-19'], ['S', '0-9'], ['B', 'Behind']];
@@ -3913,9 +3920,13 @@
     var bar = h('span', 'scbar'), fill = h('i');
     fill.style.width = Math.min(50, Math.abs(e) * 50).toFixed(1) + '%';
     fill.style.left = e >= 0 ? '50%' : (50 - Math.min(50, Math.abs(e) * 50)).toFixed(1) + '%';
-    fill.className = e >= 0 ? 'o' : 'd';
+    var lvl = Math.abs(e) < 0.08 ? 0 : Math.abs(e) < 0.2 ? 1 : 2;
+    fill.className = lvl === 0 ? 'n' : e >= 0 ? 'o' : 'd';
     bar.appendChild(fill); td.appendChild(bar);
-    td.appendChild(h('span', 'sclean', Math.abs(e) < 0.15 ? 'even' : e > 0 ? 'offense' : 'defense'));
+    var lean = h('span', 'sclean', lvl === 0 ? 'even' : (lvl === 1 ? 'slight, ' : '') + (e > 0 ? 'offense' : 'defense'));
+    lean.dataset.side = lvl === 0 ? '' : e > 0 ? 'offense' : 'defense';
+    td.appendChild(lean);
+    td.title = 'Offense at the ' + Math.round(po * 100) + 'th percentile, defense at the ' + Math.round(pd * 100) + 'th: ' + (lvl === 0 ? 'within 8 points, even' : Math.round(Math.abs(e) * 100) + ' points apart');
     return td;
   }
 
@@ -4035,8 +4046,8 @@
     });
     t.appendChild(tb); wrap.appendChild(t); host.appendChild(wrap);
     var oWins = 0, dWins = 0;
-    [].forEach.call(tb.querySelectorAll('.sclean'), function (x) { if (x.textContent === 'offense') oWins++; else if (x.textContent === 'defense') dWins++; });
-    host.appendChild(h('p', 'tblnote', off + '\'s offense ranks better on ' + oWins + ' of these measures, ' + def + '\'s defense on ' + dWins + '; the rest are within 15 percentile points. ' +
+    [].forEach.call(tb.querySelectorAll('.sclean'), function (x) { if (x.dataset.side === 'offense') oWins++; else if (x.dataset.side === 'defense') dWins++; });
+    host.appendChild(h('p', 'tblnote', off + '\'s offense ranks better on ' + oWins + ' of these measures, ' + def + '\'s defense on ' + dWins + ' (counting slight edges); the rest are even. Edge compares national percentiles: within 8 points = even, 8-20 apart = slight, 20+ = a clear edge. ' +
       'Season to date, all opponents. Ranks come from every FBS team on the same side of the ball.'));
   }
 
