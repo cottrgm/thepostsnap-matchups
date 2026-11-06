@@ -148,6 +148,7 @@ body{margin:0;padding-top:0;
 :root[data-theme="dark"] body{--hero-rule:#ffffff08; --hero-1:#1a2333; --hero-2:#141b27; --nav-bg:rgba(15,20,28,.9)}
 html.embed body{background:transparent;padding-block:0 8px}
 html.embed .pshead{display:none}
+html.embed dialog#sheet{position:absolute;inset:auto 0 auto 0;margin:0 auto}
 .pshead{margin-left:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1 * max(16px,env(safe-area-inset-right,0px)));margin-bottom:18px;position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--nav-bg);-webkit-backdrop-filter:saturate(140%) blur(10px);backdrop-filter:saturate(140%) blur(10px)}
 .pshead a{color:var(--ink);text-decoration:none}
 :root{--pslogo:url("__PS_LOGO__")}
@@ -698,7 +699,17 @@ $('foot').innerHTML = `<span>Players ranked by PFF season-to-date snaps on each 
 if (window.__EMBED && window.parent !== window) {
   const post = () => window.parent.postMessage({psMatchupsHeight: document.documentElement.scrollHeight}, location.origin);
   new ResizeObserver(post).observe(document.body); post();
-  window.addEventListener('message', e => { if (e.origin === location.origin && e.data && e.data.psTheme !== undefined) { const t = e.data.psTheme; if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); } });
+  // the frame is as tall as the board, so a centered pop-up would land far off screen: the team page
+  // tells us which slice of the frame the reader can see, and the player sheet opens there
+  let VIEW = null;
+  const sheetEl = document.getElementById('sheet');
+  const place = () => { if (!sheetEl.open || !VIEW) return; const h = Math.max(240, VIEW.h - 32); sheetEl.style.top = (VIEW.top + 16) + 'px'; sheetEl.style.maxHeight = Math.min(820, h) + 'px'; };
+  new MutationObserver(place).observe(sheetEl, {attributes: true, attributeFilter: ['open']});
+  window.addEventListener('message', e => {
+    if (e.origin !== location.origin || !e.data) return;
+    if (e.data.psTheme !== undefined) { const t = e.data.psTheme; if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); }
+    if (e.data.psView) { VIEW = e.data.psView; place(); }
+  });
 }
 render();
 document.getElementById('psload').hidden = true;
