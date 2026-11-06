@@ -289,7 +289,7 @@
     return q;
   }
   function syncLink() {
-    if (vstate.view !== 'team') return;
+    if (vstate.view !== 'team' || EMBED) return;
     history.replaceState(null, '', '?' + teamParams(new URLSearchParams()).toString());
   }
 
@@ -3792,7 +3792,7 @@
     var F = field;
     var r1 = [game(F[7], F[8], 1, '9 at 8'), game(F[4], F[11], 1, '12 at 5'), game(F[5], F[10], 1, '11 at 6'), game(F[6], F[9], 1, '10 at 7')];
     r1.forEach(function (g) { c1.appendChild(g.el); });
-    var q = [game(F[0], r1[0].w, 0), game(F[3], r1[1].w, 0), game(F[2], r1[3].w, 0), game(F[1], r1[2].w, 0)];
+    var q = [game(F[0], r1[0].w, 0), game(F[3], r1[1].w, 0), game(F[2], r1[2].w, 0), game(F[1], r1[3].w, 0)];
     q.forEach(function (g) { c2.appendChild(g.el); });
     var s = [game(q[0].w, q[1].w, 0), game(q[2].w, q[3].w, 0)];
     s.forEach(function (g) { c3.appendChild(g.el); });
@@ -3842,7 +3842,7 @@
     return (s[s.length - 1] || '').toLowerCase().replace(/[^a-z.\-]/g, '') + ',' + (s[0] || '').charAt(0).toLowerCase();
   }
   function qbProfile(root, j) {
-    var p = scPanel(root, '05', 'Dropback profile', 'Every pass and sack he was on the field for, from play-by-play, ranked against FBS quarterbacks with 100 or more dropbacks this season.');
+    var p = scPanel(root, '05', 'Dropback profile', 'Every pass and sack credited to him in the play-by-play, ranked against FBS quarterbacks with 100 or more dropbacks this season.');
     p5Loading(p.body);
     xGet('qb', { team: j.team, season: j.season }).then(function (list) {
       var me = (list || []).filter(function (x) { return x.qb === qbKey(j.athlete); })[0];
@@ -3888,21 +3888,21 @@
       p5Cards(body, [['Record', w + '-' + l, pct(w / Math.max(1, w + l), 1) + ' · ' + S.length + ' seasons'],
         ['Stops', String(stops.length), stops.join(' → ')],
         ['Against the spread', aw + al ? aw + '-' + al : '–', aw + al ? pct(aw / (aw + al), 0) + ' (2014 on)' : 'no lines on file'],
-        ['Development', devs.length ? sgn(devs.reduce(function (s, r) { return s + r.dev; }, 0) / devs.length, 1) : '–', 'points a season above what his talent predicts']]);
+        ['Development', devs.length ? sgn(devs.reduce(function (s, r) { return s + r.dev; }, 0) / devs.length, 3) : '–', 'average efficiency above what his rosters\' talent predicts']]);
       var X = tbl(['Season', 'Team', 'Record', 'Final rank', 'SP+', 'Talent rank', 'Class rank', 'Development', 'Wins above expected', 'ATS', '4th-down "go" spots taken']);
       S.slice().reverse().forEach(function (r) {
         var tr = h('tr'); tr.appendChild(td('nd', r.season)); tr.appendChild(td('pclab', r.team));
         tr.appendChild(td('nd', r.games ? r.wins + '-' + r.losses + (r.ties ? '-' + r.ties : '') : '–'));
         tr.appendChild(td('nd', r.post ? '#' + r.post : '–')); tr.appendChild(td('nd', r.sp != null ? num(r.sp, 1) : '–'));
         tr.appendChild(td('nd', r.talent_rk ? '#' + r.talent_rk : '–')); tr.appendChild(td('nd', r.recruit_rk ? '#' + r.recruit_rk : '–'));
-        var dv = td('nd pcshade', r.dev != null ? sgn(r.dev, 1) : '–'); if (r.dev_rk) dv.style.background = xRankBg(r.dev_rk, 130); tr.appendChild(dv);
+        var dv = td('nd pcshade', r.dev != null ? sgn(r.dev, 3) : '–'); if (r.dev_rk) dv.style.background = xRankBg(r.dev_rk, 130); tr.appendChild(dv);
         tr.appendChild(td('nd', r.wae != null ? sgn(r.wae, 1) : '–'));
         tr.appendChild(td('nd', r.ats_w != null && (r.ats_w + r.ats_l) ? r.ats_w + '-' + r.ats_l : '–'));
         tr.appendChild(td('nd', r.go_spots ? r.went + ' of ' + r.go_spots : '–'));
         X.tb.appendChild(tr);
       });
       body.appendChild(X.wrap);
-      body.appendChild(h('p', 'tblnote', 'Development and wins above expected are the same numbers as the Development table: how a team played against what its recruited talent predicts, and wins against what its schedule predicts. Rankings, SP+ and ATS start in 2014, fourth-down grades in 2025. The current season\'s record is to date.'));
+      body.appendChild(h('p', 'tblnote', 'Development and wins above expected are the same numbers as the Development table: opponent-adjusted net efficiency (EPA per play) against what the roster\'s recruited talent predicts, and wins against what its schedule predicts. Rankings, SP+ and ATS start in 2014, fourth-down grades in 2025. The current season\'s record is to date.'));
     }).catch(function (e) { p5Fail(body, e); });
   }
 
@@ -3924,7 +3924,7 @@
         var tr = h('tr'); tr.appendChild(td('pclab', c.name)); tr.appendChild(td('nd', c.pos || '–'));
         tr.appendChild(td('nd', c.stars ? '★'.repeat(c.stars) : '–')); tr.appendChild(td('nd', c.rating ? num(c.rating, 4) : '–'));
         tr.appendChild(td('nd', c.nat ? '#' + c.nat : '–')); tr.appendChild(td(null, c.from || '–'));
-        var txt = !c.deep_n ? 'no two-deep at this spot' : !c.deep_rated ? 'two-deep has no high-school ratings on file'
+        var txt = c.grp === 'ATH' ? 'athlete: position not set yet' : !c.deep_n ? 'no two-deep at this spot' : !c.deep_rated ? 'two-deep has no high-school ratings on file'
           : c.better_than === c.deep_rated ? 'rated above all ' + c.deep_rated + ' rated players there'
           : c.better_than ? 'rated above ' + c.better_than + ' of ' + c.deep_rated : 'rated below all ' + c.deep_rated;
         var cc = td(null, txt); if (c.deep_rated) cc.style.boxShadow = 'inset 4px 0 0 ' + shade(c.better_than / c.deep_rated); tr.appendChild(cc);
@@ -3995,11 +3995,13 @@
     p5Cards(host, [['Typical miss, blended', num(eB / n, 1) + ' pts', 'model ' + num(eM / n, 1) + ' · line ' + num(eK / n, 1) + ' (same ' + n + ' games)'],
       ['Blend picked the winner', pct(hB / n, 0), hB + ' of ' + n + ' games'],
       ['Weight on the model', pct(kAll, 0), 'the rest on the closing line']]);
+    if (kAll < 0.05) host.appendChild(h('p', 'wiflag', 'So far this season the model adds nothing to the closing line: where the two disagree, the final margin has tended to land on the line\'s side, so the best blend leans entirely on the line. The model is still shown on its own; the blend will start to move off the line if that changes.'));
     host.appendChild(h('p', 'tblnote', 'The blend starts from the betting line and moves part of the way toward the model. The weight is fitted each week only on earlier weeks, so these numbers are a fair test. Picks against the spread are the same as the model\'s, since the blend always sits between the two; what changes is how close the predicted margin lands.'));
   }
   function blendTxt(D, mm, spread, home, away) {
     if (!mm || spread == null || !D.report) return null;
     var k = blendK(D.report.filter(function (r) { return r[5] != null; })), mk = -spread, b = mk + k * (mm.margin - mk);
+    if (k < 0.05) return null;
     return (b >= 0 ? home : away) + ' by ' + num(Math.abs(b), 1);
   }
 
