@@ -178,7 +178,7 @@ html.embed.has-view dialog#sheet{position:absolute;inset:auto 0 auto 0;margin:0 
     <div class="row">
       <div class="pick"><span class="lbl">Season</span><div class="seg" id="yr" role="group" aria-label="Season"><button type="button" data-v="2026">2026 now</button><button type="button" data-v="2027">2027 projected</button></div></div>
       <div class="pick"><span class="lbl">Where</span><div class="seg" id="site" role="group" aria-label="Site"><button type="button" data-v="A">A home</button><button type="button" data-v="N">Neutral</button><button type="button" data-v="B">B home</button></div></div>
-      <div class="pick"><span class="lbl">Players</span><div class="seg" id="tier" role="group" aria-label="Tier"><button type="button" data-v="11">Top 11</button><button type="button" data-v="22">Top 22</button><button type="button" data-v="33">Top 33</button></div></div>
+      <div class="pick"><span class="lbl">Players</span><div class="seg" id="tier" role="group" aria-label="Tier"><button type="button" data-v="11">Starting 11</button><button type="button" data-v="22">Two-Deep</button><button type="button" data-v="33">Three-Deep</button></div></div>
       <label class="pick"><span class="lbl">Service</span><select id="svc" class="small-sel"></select></label>
       <div class="pick"><span class="lbl">Unrated players</span><div class="seg" id="unr" role="group" aria-label="Unrated"><button type="button" data-v="floor">At 2-star floor</button><button type="button" data-v="excl">Excluded</button></div></div>
     </div>
@@ -232,7 +232,7 @@ html.embed.has-view dialog#sheet{position:absolute;inset:auto 0 auto 0;margin:0 
   </section>
 
   <section class="panel" style="display:flex;flex-direction:column;gap:12px" aria-label="Rosters">
-    <div class="tabs"><h2><span id="rosYr"></span> top <span id="rosTier"></span></h2><div class="seg" id="rosTeam" role="group" aria-label="Team"><button type="button" data-v="A">Team A</button><button type="button" data-v="B">Team B</button></div></div>
+    <div class="tabs"><h2><span id="rosYr"></span> <span id="rosTier"></span></h2><div class="seg" id="rosTeam" role="group" aria-label="Team"><button type="button" data-v="A">Team A</button><button type="button" data-v="B">Team B</button></div></div>
     <div class="tblwrap" id="roster"></div>
   </section>
 
@@ -320,6 +320,8 @@ const S = {schTeam:'A', clsScope:'conf', clsSort:'sc', yr:2026, A:'Auburn', B:'A
 try { Object.assign(S, JSON.parse(localStorage.getItem('fbsMatchup') || '{}')); } catch(e) {}
 // saved settings from older versions: only 11/22/33 exist now, and teams must still be on the board
 if (![11, 22, 33].includes(Number(S.tier))) S.tier = 22;
+const TIER_NAME = {11: 'Starting 11', 22: 'Two-Deep', 33: 'Three-Deep'};
+const tn = t => TIER_NAME[t] || ('top ' + t);
 if (!D.teams[S.A]) S.A = 'Auburn'; if (!D.teams[S.B]) S.B = 'Alabama';
 if (!['sc','d','avg','cur','nr','team'].includes(S.clsSort)) S.clsSort = 'sc';
 if (S.clsV !== 2) { S.clsSort = 'sc'; S.clsSortDir = undefined; S.clsV = 2; }
@@ -440,12 +442,12 @@ function render(){
   const siteTxt = S.site === 'N' ? 'neutral site' : (S.site === 'A' ? `${S.A} home` : `${S.B} home`);
   const cells = S.yr === 2027 ? [
     ['2026 results carried forward', pr.res, `rating ${sgn(D.future.r26[S.A])} vs ${sgn(D.future.r26[S.B])} × ${pr.f.a.toFixed(2)}`],
-    [`2027 talent edge (top ${S.tier})`, pr.tal, `${fmt(pr.f.tal27[S.A])} vs ${fmt(pr.f.tal27[S.B])} × ${pr.f.b.toFixed(2)}`],
+    [`2027 talent edge (${tn(S.tier)})`, pr.tal, `${fmt(pr.f.tal27[S.A])} vs ${fmt(pr.f.tal27[S.B])} × ${pr.f.b.toFixed(2)}`],
     ['Home field', pr.home, siteTxt],
     ['Projected 2027 margin', pr.margin, `${S.A} perspective`],
   ] : [
     ['Season results edge', pr.res, `rating ${sgn(pr.m.rt[S.A])} vs ${sgn(pr.m.rt[S.B])}`],
-    [`Talent edge (top ${S.tier})`, pr.tal, `${fmt(pr.m.tal[S.A])} vs ${fmt(pr.m.tal[S.B])} × ${D.beta}`],
+    [`Talent edge (${tn(S.tier)})`, pr.tal, `${fmt(pr.m.tal[S.A])} vs ${fmt(pr.m.tal[S.B])} × ${D.beta}`],
     ['Home field', pr.home, siteTxt],
     ['Projected margin', pr.margin, `${S.A} perspective`],
   ];
@@ -455,13 +457,13 @@ function render(){
       const n = o.length + d.length; if (!n) return `${esc(tm)}: everyone available`;
       const named = [...o, ...d].filter(p => p.outKind !== 'idle').map(p => `${esc(p.name)} (${esc(p.out)})`);
       return `${esc(tm)}: <button class="tap" type="button" data-k="turn|${esc(tm)}|O|out">${o.length} offense</button> · <button class="tap" type="button" data-k="turn|${esc(tm)}|D|out">${d.length} defense</button> not available${named.length ? ' — ' + named.slice(0, 3).join(', ') + (named.length > 3 ? ', …' : '') : ''}`; });
-    $('outNote').innerHTML = S.yr === 2026 ? `<b>Availability (top ${S.tier}):</b> ${bits.join(' &nbsp;|&nbsp; ')}. Players who are out are left out of the talent edge; the next most-snapped player counts instead.` : '';
+    $('outNote').innerHTML = S.yr === 2026 ? `<b>Availability (${tn(S.tier)}):</b> ${bits.join(' &nbsp;|&nbsp; ')}. Players who are out are left out of the talent edge; the next most-snapped player counts instead.` : '';
   }
   if (S.yr === 2027){
     const f = pr.f;
-    $('modelNote').textContent = `How the 2027 projection works: half of this season's results rating carries over (${f.a.toFixed(2)} × the gap), plus ${f.b.toFixed(2)} points per point of projected 2027 top-${S.tier} talent gap, plus ${f.hfa.toFixed(1)} points of home field. Those weights come from predicting 2026 games using 2025 results and 2026 talent: that picked ${Math.round(f.winner*100)}% of ${f.n} winners (typical miss ${f.rmse.toFixed(1)} points), against ${Math.round(f.winner_results_only*100)}% using last season's results alone. Outgoing transfers and the rest of the 2027 class are not known yet, so this moves after signing day and the portal window.`;
+    $('modelNote').textContent = `How the 2027 projection works: half of this season's results rating carries over (${f.a.toFixed(2)} × the gap), plus ${f.b.toFixed(2)} points per point of projected 2027 ${tn(S.tier)} talent gap, plus ${f.hfa.toFixed(1)} points of home field. Those weights come from predicting 2026 games using 2025 results and 2026 talent: that picked ${Math.round(f.winner*100)}% of ${f.n} winners (typical miss ${f.rmse.toFixed(1)} points), against ${Math.round(f.winner_results_only*100)}% using last season's results alone. Outgoing transfers and the rest of the 2027 class are not known yet, so this moves after signing day and the portal window.`;
   } else {
-    $('modelNote').textContent = `How it works: a margin rating built from every completed 2026 game (actual margins, no cap; FCS opponents pooled), plus ${D.beta} points per point of top-${S.tier} talent gap, plus ${pr.m.hfa.toFixed(1)} points of home field. Win odds assume a typical miss of ${D.bench.sigma.toFixed(1)} points. Tested week by week on games it hadn't seen, it picked ${Math.round(D.bench.model_winner*100)}% of winners (typical miss ${D.bench.model_rmse.toFixed(1)}); the betting line picked ${Math.round(D.bench.market_winner*100)}% of the same ${D.bench.n} games (typical miss ${D.bench.market_rmse.toFixed(1)}). The odds always use All Services talent with unrated at the floor; the service and unrated filters change the talent views below, not the odds.`;
+    $('modelNote').textContent = `How it works: a margin rating built from every completed 2026 game (actual margins, no cap; FCS opponents pooled), plus ${D.beta} points per point of ${tn(S.tier)} talent gap, plus ${pr.m.hfa.toFixed(1)} points of home field. Win odds assume a typical miss of ${D.bench.sigma.toFixed(1)} points. Tested week by week on games it hadn't seen, it picked ${Math.round(D.bench.model_winner*100)}% of winners (typical miss ${D.bench.model_rmse.toFixed(1)}); the betting line picked ${Math.round(D.bench.market_winner*100)}% of the same ${D.bench.n} games (typical miss ${D.bench.market_rmse.toFixed(1)}). The odds always use All Services talent with unrated at the floor; the service and unrated filters change the talent views below, not the odds.`;
   }
 
   for (const [el, t, cls] of [['factA', S.A, 'a'], ['factB', S.B, 'b']]){
@@ -497,7 +499,7 @@ function unitPanel(el, off, def, co, cd){
     return `<div class="vs"><button class="tap va" data-k="${esc(ka)}" type="button">${fmt(a)}</button><div class="meter l"><i style="width:${w(a)}%;background:var(--${co})"></i></div><div class="grp">${esc(lab)}<br>${edge}</div><div class="meter"><i style="width:${w(b)}%;background:var(--${cd})"></i></div><button class="tap vb" data-k="${esc(kb)}" type="button">${fmt(b)}</button></div>`;
   }).join('');
   $(el).innerHTML = `<h3><span style="color:var(--${co})"><span>${esc(off)}</span> offense</span> vs <span style="color:var(--${cd})"><span>${esc(def)}</span> defense</span></h3>${html}
-    <p class="note" style="margin:8px 0 0">${S.svc === 'ALL' ? 'All Services' : esc(S.svc)} percentile, 0–100, top ${t} on each side, unrated ${S.unr === 'floor' ? 'scored as 0' : 'left out'}. Tap a number for the players.</p>`;
+    <p class="note" style="margin:8px 0 0">${S.svc === 'ALL' ? 'All Services' : esc(S.svc)} percentile, 0–100, ${tn(t)} on each side, unrated ${S.unr === 'floor' ? 'scored as 0' : 'left out'}. Tap a number for the players.</p>`;
 }
 
 function table(){
@@ -536,10 +538,10 @@ function playerRows(ps, svc, yr = S.yr){
 
 function lostRows(ps){
   const body = ps.slice().sort((a, b) => (b.all ?? -1) - (a.all ?? -1)).map(p => `<tr><td style="font-family:var(--body);text-align:left">${esc(p.name)}<div class="note">${esc(p.cls || '')}</div></td><td>${esc(p.pos)}</td><td style="font-family:var(--body);text-align:left">${esc(p.team)}</td><td>${p.rank}</td><td><b>${fmt(p.all)}</b></td></tr>`).join('');
-  return `<div class="tblwrap"><table class="pl"><tr><th style="text-align:left">Player</th><th>Pos</th><th style="text-align:left">Now at</th><th>Rank there</th><th>All</th></tr>${body || '<tr><td colspan="5" class="note">None in another team\'s top 33.</td></tr>'}</table></div>`;
+  return `<div class="tblwrap"><table class="pl"><tr><th style="text-align:left">Player</th><th>Pos</th><th style="text-align:left">Now at</th><th>Rank there</th><th>All</th></tr>${body || '<tr><td colspan="5" class="note">None in another team\'s Three-Deep.</td></tr>'}</table></div>`;
 }
 function roster(){
-  const team = S.rosTeam === 'A' ? S.A : S.B; $('rosTier').textContent = S.tier; $('rosYr').textContent = S.yr === 2027 ? 'Projected 2027' : '2026';
+  const team = S.rosTeam === 'A' ? S.A : S.B; $('rosTier').textContent = tn(S.tier); $('rosYr').textContent = S.yr === 2027 ? 'Projected 2027' : '2026';
   const o = inTier(team, 'O', S.tier), d = inTier(team, 'D', S.tier);
   const outOf = side => S.yr === 2026 ? outList(team, side, S.tier) : [];
   const outBlock = side => { const x = outOf(side); return x.length ? `<h3 class="lbl" style="margin:10px 0 4px;color:var(--b)">${side === 'O' ? 'Offense' : 'Defense'} · not available (${x.length}) — replaced by the next most-snapped players</h3>${playerRows(x, S.svc)}` : ''; };
@@ -568,7 +570,7 @@ function turnover(){
       const v0 = pctVal(team, side, t, 'ALL', S.unr, 2026), v1 = pctVal(team, side, t, 'ALL', S.unr, 2027), d = v1 - v0;
       const r0 = natRank(team, side, t, 2026), r1 = natRank(team, side, t, 2027), dr = r0 - r1;
       const L = turnLists(team, side, t), k = x => `turn|${team}|${side}|${x}`;
-      return `<div class="tside"><span class="lbl">${side === 'O' ? 'Offense' : 'Defense'} · top ${t}</span><span></span>
+      return `<div class="tside"><span class="lbl">${side === 'O' ? 'Offense' : 'Defense'} · ${tn(t)}</span><span></span>
         <span class="big num">${fmt(v0)} → ${fmt(v1)}</span><span class="dl ${d > 0.05 ? 'up' : d < -0.05 ? 'dn' : ''}" style="font-size:14px">${sgn(d)}</span>
         <span class="note">National rank</span><span class="num">#${r0} → #${r1} <span class="dl ${dr > 0 ? 'up' : dr < 0 ? 'dn' : ''}">${dr > 0 ? '▲' + dr : dr < 0 ? '▼' + (-dr) : 'even'}</span></span>
         <div class="tcounts">
@@ -577,14 +579,14 @@ function turnover(){
           <span>Returning <button class="tap" type="button" data-k="${k('ret')}">${L.ret.length}</button></span>
           <span>2026 transfers in <button class="tap" type="button" data-k="${k('tin')}">${L.tin.length}</button></span>
           <span>Lost to transfer <button class="tap" type="button" data-k="${k('lost')}">${L.lost.length}</button></span>
-          <span>Freshmen in the top ${t} <button class="tap" type="button" data-k="${k('fresh')}">${L.fresh.length}</button></span>
+          <span>Freshmen in the ${tn(t)} <button class="tap" type="button" data-k="${k('fresh')}">${L.fresh.length}</button></span>
           <span>Not available now <button class="tap" type="button" data-k="${k('out')}">${L.out.length}</button></span>
         </div></div>`;
     }).join('');
     $(el).innerHTML = `<h3 style="font:800 18px/1 var(--display);text-transform:uppercase;margin:0;color:var(--${cls})">${esc(team)}</h3>${blocks}`;
   }
   $('turnNote').textContent = `All Services percentile, unrated ${S.unr === 'floor' ? 'at floor' : 'excluded'}`;
-  $('turnFoot').textContent = 'Rank is the honest read: incoming recruits are all rated while the backups they compete with often are not on a depth chart, so most teams gain a little raw talent. "Lost to transfer" = players from the 2025 roster who are now in another team\'s 2026 top 33, matched year over year from CFBD rosters. Outgoing 2027 transfers and late signees are unknown until December and January.';
+  $('turnFoot').textContent = 'Rank is the honest read: incoming recruits are all rated while the backups they compete with often are not on a depth chart, so most teams gain a little raw talent. "Lost to transfer" = players from the 2025 roster who are now in another team\'s 2026 Three-Deep, matched year over year from CFBD rosters. Outgoing 2027 transfers and late signees are unknown until December and January.';
 }
 
 // ---------- talent gap by game (Pink's Show style) ----------
@@ -618,12 +620,12 @@ function schedule(){
     return `<tr><td style="font-family:var(--mono)">${r.post ? 'Post' : r.wk}</td><td class="note" style="white-space:nowrap">${dt}</td><td style="text-align:left;font-family:var(--body)">${r.site === 'A' ? '@ ' : r.site === 'N' ? 'vs ' : ''}${oppBtn}${cfp}</td><td>${theirs}</td><td>${gapTxt}</td><td style="white-space:nowrap"><span class="dl ${cls}" style="font-size:13px">${res}</span></td></tr>`;
   }).join('');
   const unitTxt = S.svc === 'ALL' ? 'All Services percentile' : S.svc + ' rating points';
-  $('sched').innerHTML = `<table><tr><th>Wk</th><th>Date</th><th style="text-align:left">Opponent</th><th title="Opponent's top-${S.tier} talent (offense and defense averaged) and its national rank among 138 FBS teams">Their talent · rank</th><th title="${esc(team)}'s talent minus the opponent's, same units">${esc(team)} edge</th><th>Result / projection</th></tr>${body}</table>`;
-  $('schNote').innerHTML = `<b>${esc(team)}</b> top-${S.tier} talent ${fmt(me)}, #${myRank} nationally (${unitTxt}, offense and defense averaged, unrated ${S.unr === 'floor' ? 'at the floor' : 'excluded'}; players who are out are left out). Record with the talent edge: <b>${advW}-${advL}</b>. Without it: <b>${disW}-${disL}</b>.${fcsW + fcsL ? ` Against FCS: ${fcsW}-${fcsL}.` : ''} Projections use the same model as the matchup above; FCS opponents get the pooled FCS rating. Tap an FBS opponent to load that matchup.`;
+  $('sched').innerHTML = `<table><tr><th>Wk</th><th>Date</th><th style="text-align:left">Opponent</th><th title="Opponent's ${tn(S.tier)} talent (offense and defense averaged) and its national rank among 138 FBS teams">Their talent · rank</th><th title="${esc(team)}'s talent minus the opponent's, same units">${esc(team)} edge</th><th>Result / projection</th></tr>${body}</table>`;
+  $('schNote').innerHTML = `<b>${esc(team)}</b> ${tn(S.tier)} talent ${fmt(me)}, #${myRank} nationally (${unitTxt}, offense and defense averaged, unrated ${S.unr === 'floor' ? 'at the floor' : 'excluded'}; players who are out are left out). Record with the talent edge: <b>${advW}-${advL}</b>. Without it: <b>${disW}-${disL}</b>.${fcsW + fcsL ? ` Against FCS: ${fcsW}-${fcsL}.` : ''} Projections use the same model as the matchup above; FCS opponents get the pooled FCS rating. Tap an FBS opponent to load that matchup.`;
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-opp]'); if (!b) return; const team = S.schTeam === 'A' ? S.A : S.B; S.A = team; S.B = b.dataset.opp; S.site = siteFromSchedule() ?? 'N'; render(); window.scrollTo({top: 0, behavior: 'smooth'}); });
 
-// ---------- 2027 class impact: incoming class vs current top 33 ----------
+// ---------- 2027 class impact: incoming class vs current Three-Deep ----------
 function classImpact(){
   const svcIdx = S.svc === 'ALL' ? -1 : SV.indexOf(S.svc);
   const score = p => svcIdx < 0 ? p.all : (p.s[svcIdx][2] === 'U' ? null : p.s[svcIdx][0]);
@@ -644,7 +646,7 @@ function classImpact(){
   const rankBy = (key) => { for (const r of rows) r[key + 'Rk'] = 1 + rows.filter(x => x[key] > r[key]).length; };
   rankBy('avg'); rankBy('d'); rankBy('cur'); rankBy('sc');
   // the sortable metrics; '#' always shows the national rank on whichever metric the table is sorted by
-  const cols = {sc: [-1, 'Class rank score', 'scRk'], d: [-1, 'Impact', 'dRk'], avg: [-1, 'Class avg', 'avgRk'], cur: [-1, 'Current top 33', 'curRk'], nr: [-1, 'Rated commits', null], team: [1, 'Team', null]};
+  const cols = {sc: [-1, 'Class rank score', 'scRk'], d: [-1, 'Impact', 'dRk'], avg: [-1, 'Class avg', 'avgRk'], cur: [-1, 'Current Three-Deep', 'curRk'], nr: [-1, 'Rated commits', null], team: [1, 'Team', null]};
   if (!cols[S.clsSort]) S.clsSort = 'sc';
   const dir = S.clsSortDir ?? cols[S.clsSort][0];
   const val = r => S.clsSort === 'team' ? r.team : r[S.clsSort];
@@ -658,7 +660,7 @@ function classImpact(){
   const rk = n => `<span class="note">#${n}</span>`;
   $('classes').innerHTML = `<table><tr><th style="text-align:left" title="National rank on the sorted column">#</th>${th('team', 1)}${th('sc')}${th('d')}${th('avg')}${th('cur')}${th('nr')}</tr>${show.map(r => `<tr style="${r.team === S.A ? 'background:var(--a-soft)' : r.team === S.B ? 'background:var(--b-soft)' : ''}"><td style="text-align:left;font-family:var(--mono)">${r[rkKey]}</td><td style="text-align:left;font-family:var(--body)">${esc(r.team)} <span class="note">${esc(r.conf)}</span></td><td>${fmt(r.sc, 1)} ${rk(r.scRk)}</td><td><span class="dl ${r.d > 0 ? 'up' : 'dn'}" style="font-size:13px">${sgn(r.d, dp)}</span> ${rk(r.dRk)}</td><td>${fmt(r.avg, dp)} ${rk(r.avgRk)}</td><td>${fmt(r.cur, dp)} ${rk(r.curRk)}</td><td><button class="tap" type="button" data-k="class|${esc(r.team)}">${r.nr}</button>${r.n > r.nr ? `<span class="note"> of ${r.n}</span>` : ''}</td></tr>`).join('')}</table>`;
   const unit = S.svc === 'ALL' ? 'All Services percentile (0-100, each service\'s rating converted to a percentile of its high-school pool, then averaged)' : `${S.svc} rating`;
-  $('clsNote').innerHTML = `<b>Class rank score</b> = how the class ranks as a whole, the way the recruiting sites rank team classes: every rated commit's ${S.svc === 'ALL' ? 'All Services' : esc(S.svc)} percentile, best first, with the top of the class weighted most, scaled so a full 25-man class of Nth-percentile players scores about N. It rewards size and quality together, so a small elite class does not outrank a full one. This is the default sort. <b>Impact</b> = class avg minus current top 33; positive means the incoming class is better than the players it joins. <b>Class avg</b> = average ${unit} of the school's rated 2027 commits. <b>Current top 33</b> = average of the 33 most-snapped available players on offense and on defense this season, same scale, unrated excluded. <b>Rated commits</b> = committed 2027 signees this service rates (tap to see them; "of N" = all commits). Small <b>#</b> = national rank on that column among ${rows.length} FBS teams; the first column is the rank on whichever column is sorted. Tap a column heading to sort. Classes are not final until signing day.`;
+  $('clsNote').innerHTML = `<b>Class rank score</b> = how the class ranks as a whole, the way the recruiting sites rank team classes: every rated commit's ${S.svc === 'ALL' ? 'All Services' : esc(S.svc)} percentile, best first, with the top of the class weighted most, scaled so a full 25-man class of Nth-percentile players scores about N. It rewards size and quality together, so a small elite class does not outrank a full one. This is the default sort. <b>Impact</b> = class avg minus current Three-Deep; positive means the incoming class is better than the players it joins. <b>Class avg</b> = average ${unit} of the school's rated 2027 commits. <b>Current Three-Deep</b> = average of the 33 most-snapped available players on offense and on defense this season, same scale, unrated excluded. <b>Rated commits</b> = committed 2027 signees this service rates (tap to see them; "of N" = all commits). Small <b>#</b> = national rank on that column among ${rows.length} FBS teams; the first column is the rank on whichever column is sorted. Tap a column heading to sort. Classes are not final until signing day.`;
 }
 document.addEventListener('click', e => { const h = e.target.closest('[data-cls-sort]'); if (!h) return; const k = h.dataset.clsSort;
   if (S.clsSort === k) S.clsSortDir = -(S.clsSortDir ?? (k === 'team' ? 1 : -1)); else { S.clsSort = k; S.clsSortDir = undefined; }
@@ -668,9 +670,9 @@ document.addEventListener('click', e => { const h = e.target.closest('[data-cls-
 function openSheet(key){
   const parts = key.split('|'), kind = parts[0], t = S.tier;
   let ps = [], title = '', sub = '', svc = S.svc;
-  if (kind === 'unit'){ const [, team, side] = parts; ps = inTier(team, side, t); title = `${team} ${side === 'O' ? 'offense' : 'defense'}`; sub = `Top ${t} · ${svc === 'ALL' ? 'All Services' : svc}`; }
-  if (kind === 'grp'){ const [, team, side, g] = parts; ps = inTier(team, side, t).filter(p => p.grp === g); title = `${team} ${g}`; sub = `Top ${t} ${side === 'O' ? 'offense' : 'defense'} · ${ps.length} players`; }
-  if (kind === 'svc'){ const [, team, side, s] = parts; svc = s; ps = inTier(team, side, t); title = `${team} ${side === 'O' ? 'offense' : 'defense'}`; sub = `Top ${t} · ${s === 'ALL' ? 'All Services' : s}`; }
+  if (kind === 'unit'){ const [, team, side] = parts; ps = inTier(team, side, t); title = `${team} ${side === 'O' ? 'offense' : 'defense'}`; sub = `${tn(t)} · ${svc === 'ALL' ? 'All Services' : svc}`; }
+  if (kind === 'grp'){ const [, team, side, g] = parts; ps = inTier(team, side, t).filter(p => p.grp === g); title = `${team} ${g}`; sub = `${tn(t)} ${side === 'O' ? 'offense' : 'defense'} · ${ps.length} players`; }
+  if (kind === 'svc'){ const [, team, side, s] = parts; svc = s; ps = inTier(team, side, t); title = `${team} ${side === 'O' ? 'offense' : 'defense'}`; sub = `${tn(t)} · ${s === 'ALL' ? 'All Services' : s}`; }
   if (kind === 'class'){
     const team = parts[1]; ps = (byTeam[team] || []).filter(p => p.st === 'C').sort((a, b) => (b.all ?? 0) - (a.all ?? 0));
     $('shTitle').textContent = `${team}: 2027 commits`; $('shSub').textContent = `${ps.length} committed · ratings from each service`;
@@ -679,8 +681,8 @@ function openSheet(key){
   if (kind === 'turn'){
     const [, team, side, x] = parts; const L = turnLists(team, side, t);
     ps = L[x]; const sd = side === 'O' ? 'offense' : 'defense';
-    title = {out: `${team}: not available now`, fresh: `${team}: freshmen in the top ${t}`, leaveE: `${team}: leaving, out of eligibility`, leaveP: `${team}: leaving, transfer portal`, leave: `${team}: leaving`, arrive: `${team}: 2027 commits in the top ${t}`, ret: `${team}: returning in 2027`, tin: `${team}: 2026 transfers in`, lost: `${team}: lost to transfer`}[x];
-    sub = {out: `Would be in the 2026 top ${t} ${sd} on season snaps; dropped from remaining-game projections`, fresh: `True freshmen (2026 class) in the 2026 top ${t} ${sd}: early equity`, leaveE: `Seniors and graduates in the 2026 top ${t} ${sd}`, leaveP: `Announced portal entrants in the 2026 top ${t} ${sd} (the portal window opens in January)`, leave: `Seniors and graduates in the 2026 top ${t} ${sd}`, arrive: `Projected 2027 top ${t} ${sd}`, ret: `Projected 2027 top ${t} ${sd}`, tin: `2026 top ${t} ${sd} · from another 2025 roster`, lost: `On ${team}'s 2025 roster, now in another team's 2026 top 33 ${sd}`}[x] + ` · ${ps.length} players`;
+    title = {out: `${team}: not available now`, fresh: `${team}: freshmen in the ${tn(t)}`, leaveE: `${team}: leaving, out of eligibility`, leaveP: `${team}: leaving, transfer portal`, leave: `${team}: leaving`, arrive: `${team}: 2027 commits in the ${tn(t)}`, ret: `${team}: returning in 2027`, tin: `${team}: 2026 transfers in`, lost: `${team}: lost to transfer`}[x];
+    sub = {out: `Would be in the 2026 ${tn(t)} ${sd} on season snaps; dropped from remaining-game projections`, fresh: `True freshmen (2026 class) in the 2026 ${tn(t)} ${sd}: early equity`, leaveE: `Seniors and graduates in the 2026 ${tn(t)} ${sd}`, leaveP: `Announced portal entrants in the 2026 ${tn(t)} ${sd} (the portal window opens in January)`, leave: `Seniors and graduates in the 2026 ${tn(t)} ${sd}`, arrive: `Projected 2027 ${tn(t)} ${sd}`, ret: `Projected 2027 ${tn(t)} ${sd}`, tin: `2026 ${tn(t)} ${sd} · from another 2025 roster`, lost: `On ${team}'s 2025 roster, now in another team's 2026 Three-Deep ${sd}`}[x] + ` · ${ps.length} players`;
     $('shTitle').textContent = title; $('shSub').textContent = sub;
     $('shBody').innerHTML = x === 'lost' ? lostRows(ps) : playerRows(ps, S.svc, x === 'arrive' || x === 'ret' ? 2027 : 2026);
     const dlg = $('sheet'); if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); return;
@@ -689,7 +691,7 @@ function openSheet(key){
     const [, team, side, s, b] = parts; svc = s;
     ps = inTier(team, side, t).filter(p => bucket(p, s) === b);
     title = `${team}: ${b === 'H' ? 'high-school recruits, rated' : b === 'T' ? 'transfers' : 'high-school recruits, unrated'}`;
-    sub = `Top ${t} ${side === 'O' ? 'offense' : 'defense'} · ${s === 'ALL' ? 'any service' : s} · ${ps.length} players`;
+    sub = `${tn(t)} ${side === 'O' ? 'offense' : 'defense'} · ${s === 'ALL' ? 'any service' : s} · ${ps.length} players`;
   }
   $('shTitle').textContent = title; $('shSub').textContent = sub;
   $('shBody').innerHTML = playerRows(ps, svc);
@@ -701,7 +703,7 @@ $('sheet').addEventListener('click', e => { if (e.target === $('sheet')) $('shee
 
 const last = new Date(D.last_played);
 $('asof').textContent = `2026 depth charts and recruiting ratings for all ${TEAMS.length} FBS teams · results through ${last.toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'America/Chicago'})}`;
-$('foot').innerHTML = `<span>Players ranked by PFF season-to-date snaps on each side of the ball: the 11, 22 and 33 most-snapped players. Refreshed weekly from PFF.</span><span>Original high-school ratings from 247Sports, 247 Composite (via CollegeFootballData), On3, On3 Industry, ESPN and Rivals. Portal-only ratings count at a ${Math.round(D.discount*100)}% discount above each service's 2-star floor.</span><span>Results, SP+, FPI and Elo from CollegeFootballData. Market lines are the median across books.</span>`;
+$('foot').innerHTML = `<span>Players ranked by PFF season-to-date snaps on each side of the ball: the 11, 22 and 33 most-snapped players (Starting 11, Two-Deep and Three-Deep). Refreshed weekly from PFF.</span><span>Original high-school ratings from 247Sports, 247 Composite (via CollegeFootballData), On3, On3 Industry, ESPN and Rivals. Portal-only ratings count at a ${Math.round(D.discount*100)}% discount above each service's 2-star floor.</span><span>Results, SP+, FPI and Elo from CollegeFootballData. Market lines are the median across books.</span>`;
 if (window.__EMBED && window.parent !== window) {
   const post = () => window.parent.postMessage({psMatchupsHeight: document.documentElement.scrollHeight}, location.origin);
   new ResizeObserver(post).observe(document.body); post();
