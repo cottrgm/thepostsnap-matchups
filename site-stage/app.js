@@ -4016,6 +4016,17 @@
      Round 7: injury reports, why the model likes a pick, upset watch,
      halves, QB rankings and comparisons, weather, who leaves vs who comes.
      ===================================================================== */
+  /* a busy database can time out one request when a page asks for many at once: retry site API reads up to twice */
+  (function () {
+    var f0 = window.fetch.bind(window);
+    window.fetch = function (u, o) {
+      var url = String((u && u.url) || u);
+      if ((o && o.method && o.method !== 'GET') || !/(^|\/)api\//.test(url) || /^https?:/.test(url) && url.indexOf(location.origin) !== 0) return f0(u, o);
+      var n = 0;
+      function go() { return f0(u, o).then(function (r) { if (r.status >= 500 && n++ < 2) return new Promise(function (ok) { setTimeout(ok, 1200 * n); }).then(go); return r; }); }
+      return go();
+    };
+  })();
   var INJ_LABEL = { season: 'Out for season', out: 'Out', doubtful: 'Doubtful', questionable: 'Questionable', probable: 'Probable', available: 'Available', news: 'Update' };
   function scInjuries(host, A, B) {
     p5Loading(host);
