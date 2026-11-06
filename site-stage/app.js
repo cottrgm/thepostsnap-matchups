@@ -3417,9 +3417,9 @@
   }
 
   /* ---------------- playoff what-if ---------------- */
-  oddsState.force = {};
   function buildWhatIf() {
     var view = document.getElementById('oddsBody'); if (!view) return;
+    oddsState.force = oddsState.force || {};
     var box = document.getElementById('whatIf');
     if (!box) { box = h('div', 'whatif'); box.id = 'whatIf'; view.parentNode.insertBefore(box, view); }
     scGet('api/matchups-data').then(function (D) {
