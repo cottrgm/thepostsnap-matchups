@@ -388,6 +388,14 @@
     });
     return h2cLoading;
   }
+  function fdShadeRank(cell, key, rk, pool) {
+    if (!key || !rk || !(pool > 1)) { cell.style.background = 'transparent'; return; }
+    var t = 1 - (rk - 1) / (pool - 1);
+    if (key === 'rk_share') {
+      cell.style.background = 'color-mix(in srgb, var(--muted) ' + Math.round(8 + t * 37) + '%, transparent)';
+      cell.title = 'How often, not how well: #1 = this zone gets the biggest share of plays in FBS. Darker gray = more often.';
+    } else cell.style.background = shade(t);
+  }
   /* ---- share cards: a section framed for social, sized for where it is going ---- */
   var CARD_SIZES = { wide: [1200, 675, 'X / wide'], square: [1080, 1080, 'Square'], tall: [1080, 1350, 'Portrait'], raw: [0, 0, 'Just the section'] };
   function shareContext() {
@@ -1075,25 +1083,25 @@
     var th2 = h('thead'); th2.appendChild(tr2); t2.appendChild(th2);
     var tb2 = h('tbody');
     rows.forEach(function (rw) {
+      if (rw[0] === 'n') return;  /* the count rides along in the share row's label */
       var r = h('tr');
-      r.appendChild(h('td', 'pclab', rw[1]));
+      r.appendChild(h('td', 'pclab', rw[0] === 'share' ? rw[1] + ' (' + z.n + (oz2 ? ', ' + oTag + ' ' + oz2.n : '') + ' ' + (runs ? 'runs' : 'targets') + ')' : rw[1]));
       r.appendChild(h('td', null, fmtv(rw[0], z[rw[0]])));
       r.appendChild(h('td', 'nd', rw[0] === 'n' ? '' : fmtv(rw[0], z.nat ? z.nat[rw[0]] : null)));
-      var rc = h('td', 'pcshade', rw[2] ? rankTxt(z[rw[2]], z.pool) : '');
-      if (rw[2] && rw[2] !== 'rk_share' && z[rw[2]] && z.pool > 1) rc.style.background = shade(1 - (z[rw[2]] - 1) / (z.pool - 1));
-      else rc.style.background = 'transparent';
+      var rc = h('td', 'pcshade', rw[2] ? rankTxt(z[rw[2]], z.pool) + (rw[2] === 'rk_share' ? ' most' : '') : '');
+      fdShadeRank(rc, rw[2], z[rw[2]], z.pool);
       r.appendChild(rc);
       if (oz2) {
         r.appendChild(h('td', null, fmtv(rw[0], oz2[rw[0]])));
-        var oc = h('td', 'pcshade', rw[2] ? rankTxt(oz2[rw[2]], oz2.pool) : '');
-        if (rw[2] && rw[2] !== 'rk_share' && oz2[rw[2]] && oz2.pool > 1) oc.style.background = shade(1 - (oz2[rw[2]] - 1) / (oz2.pool - 1));
-        else oc.style.background = 'transparent';
+        var oc = h('td', 'pcshade', rw[2] ? rankTxt(oz2[rw[2]], oz2.pool) + (rw[2] === 'rk_share' ? ' most' : '') : '');
+        fdShadeRank(oc, rw[2], oz2[rw[2]], oz2.pool);
         r.appendChild(oc);
       }
       tb2.appendChild(r);
     });
     t2.appendChild(tb2);
     var w2 = h('div', 'tablewrap'); w2.appendChild(t2); host.appendChild(w2);
+    host.appendChild(h('p', 'tblnote', 'Blue and red rank how well the plays here go (blue = better for that side). Share is gray because it is how often, not how well: darker means this zone gets more of the plays than at most FBS schools.'));
     /* who gets the ball here */
     var list = runs ? (j.runs || []).filter(function (p) { return 'R' + p[0] === k; }) : (j.passes || []).filter(function (p) { return p[17] === k; });
     var by = {};
