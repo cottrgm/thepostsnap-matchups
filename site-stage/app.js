@@ -224,7 +224,7 @@
      deeper numbers) share one filter bar and one offense/defense switch, and only load when
      their tab is open. The address bar always holds the current view, so a link reopens it. */
   var TEAM_TABS = [
-    { id: 'overview', label: 'Overview', nums: ['01', '21', '20', '30', '02', '03', '07', '16'] },
+    { id: 'overview', label: 'Overview', nums: ['01', '31', '21', '20', '30', '02', '03', '07', '16'] },
     { id: 'playcalling', label: 'Playcalling', nums: ['12', '13', '23', '24', '29', '06'] },
     { id: 'field', label: 'On the field', nums: ['14', '05'] },
     { id: 'units', label: 'Players & units', nums: ['15', '22', '27', '28', '17', '08'] },
@@ -266,7 +266,7 @@
   function muQueue() { if (muQueued) return; muQueued = true; setTimeout(function () { muQueued = false; muView(); }, 60); }
   window.addEventListener('scroll', muQueue, { passive: true });
   window.addEventListener('resize', muQueue);
-  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); } };
+  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); }, '31': function () { buildReview(); } };
   state.teamTab = state.teamTab || 'overview'; state.gSide = state.gSide || 0;
   state.liveKey = 0; state.liveDone = {};
 
@@ -3094,6 +3094,8 @@
     scTravel(g, A, B);
     scWeather(g, A, B);
     scSeries(g, A, B);
+    scLine(g, A, B);
+    scShort(g, A, B);
     setTimeout(addShareButtons, 50);
     var side = function (team, sd) { return 'team=' + encodeURIComponent(team) + '&season=' + s + '&side=' + sd; };
     var dir = 0;
@@ -3393,6 +3395,7 @@
     });
     host.appendChild(X.wrap);
     try { drawBlend(host, D); } catch (e) { console.error(e); }
+    try { drawCalib(host, D); } catch (e) { console.error(e); }
     host.appendChild(h('p', 'tblnote', 'Honest test: each week is predicted from a rating fit only on the games before it (week 3 on, FBS vs FBS). "Against the spread" counts games where the model and the closing line differed by at least half a point, and whether the final margin landed on the model\'s side. The betting market is a tough benchmark and usually wins; this is a record, not a recommendation.'));
   }
 
@@ -4074,6 +4077,7 @@
       });
       host.appendChild(h('p', 'tblnote', 'From the conference availability reports and team news, collected every hour through RotoWire\'s injury wire, plus reports added by hand when a major one breaks. Status is read from the report\'s wording. Players ruled out are marked "(out)" in the tables above, and the matchup board drops them from the Two-Deep at its next rebuild.'));
       injImpact(host, list, A, B);
+      injSnaps(host, list, A, B);
       var outs = list.filter(function (x) { return x.status === 'out' || x.status === 'season'; });
       function flag() {
         var root = document.getElementById('scoutBody') || document;
@@ -4345,12 +4349,180 @@
   setTimeout(pollAlerts, 4000);
 
   /* =====================================================================
+     Round 9: line movement, short yardage, snaps lost to injury,
+     My team page, season in review, model calibration.
+     ===================================================================== */
+
+  /* ---- scouting: how the line has moved since it opened ---- */
+  function scLine(g, A, B) {
+    Promise.all([xGet('line', { home: B, away: A, season: state.season }), scGet('api/matchups-data').catch(function () { return null; })]).then(function (r) {
+      var L = r[0], D = r[1], tiles = document.getElementById('scoutTiles'); if (!tiles || !L || L.now == null) return;
+      var d = h('div', 'tile'); d.appendChild(h('span', 'k', 'Line movement'));
+      var txt = L.open != null && +L.open !== +L.now ? 'Opened ' + lineTxt(B, A, +L.open) + ' · now ' + lineTxt(B, A, +L.now) : 'Steady at ' + lineTxt(B, A, +L.now);
+      d.appendChild(h('span', 'v resttxt', txt));
+      var bits = [];
+      if (L.ou_open != null && L.ou != null && +L.ou_open !== +L.ou) bits.push('Total ' + num(+L.ou_open, 1) + ' → ' + num(+L.ou, 1));
+      var mm = D ? psModel(D, B, A, g.neutral_site) : null;
+      if (mm && L.open != null && +L.open !== +L.now) {
+        var toward = Math.abs(mm.margin + +L.now) < Math.abs(mm.margin + +L.open);
+        bits.push('moved ' + (toward ? 'toward' : 'away from') + ' the Post-Snap model (' + pickTxt(B, A, mm).replace(/ \(.*\)$/, '') + ')');
+      }
+      if (L.provider) bits.push(L.provider);
+      if (bits.length) d.appendChild(h('span', 'r', bits.join(' · ')));
+      tiles.appendChild(d);
+    }).catch(function () {});
+  }
+
+  /* ---- scouting: third and fourth and short ---- */
+  function scShort(g, A, B) {
+    xGet('short', { a: A, b: B, season: state.season }).then(function (S) {
+      var tiles = document.getElementById('scoutTiles'); if (!tiles || !S) return;
+      function line(off, def) {
+        var o = S[off + '|Offense'], dd = S[def + '|Defense']; if (!o || !dd) return null;
+        return off + ' converts ' + pct(+o.sr, 0) + ' (#' + o.rk + '), ' + def + ' allows ' + pct(+dd.sr, 0) + ' (#' + dd.rk + ')';
+      }
+      var a = line(A, B), b = line(B, A); if (!a && !b) return;
+      var d = h('div', 'tile'); d.appendChild(h('span', 'k', 'Third and fourth and short'));
+      d.appendChild(h('span', 'v resttxt', a || ''));
+      if (b) d.appendChild(h('span', 'r', b));
+      d.title = 'Success rate on third and fourth down with one or two yards to go, runs and passes, ranked among FBS teams (on defense, lower is better).';
+      tiles.appendChild(d);
+    }).catch(function () {});
+  }
+
+  /* ---- injury impact for any position: snaps and place on the depth chart ---- */
+  function injSnaps(host, list, A, B) {
+    var outs = list.filter(function (x) { return x.status === 'out' || x.status === 'season' || x.status === 'doubtful'; });
+    if (!outs.length) return;
+    scGet('api/matchups-data').then(function (D) {
+      [].forEach.call(host.querySelectorAll('tr'), function (tr) {
+        var c = tr.firstChild; if (!c || c.tagName !== 'TD' || c.querySelector('.injsnap')) return;
+        var tbl0 = tr.closest('.tablewrap'), h3 = tbl0 && tbl0.previousElementSibling, team = h3 && h3.textContent;
+        var x = outs.filter(function (o) { return o.team === team && c.textContent.indexOf(o.player) === 0; })[0]; if (!x) return;
+        var T = SC_BOARD_NAME[team] || team;
+        var p = (D.players || []).filter(function (q) { return q[0] === T && q[4] === x.player && q[6] !== 'C'; })[0];
+        if (!p || !p[15]) return;
+        c.appendChild(h('span', 'injrole injsnap', p[15] + ' snaps · #' + p[19] + ' on the ' + (p[1] === 'O' ? 'offense' : 'defense') + ' in playing time' + (p[19] <= 22 ? ' (Two-Deep)' : '')));
+      });
+    }).catch(function () {});
+  }
+
+  /* ---- My team: one small page for the phone ---- */
+  function buildMine() {
+    var root = document.getElementById('mineBody'); if (!root) return;
+    root.innerHTML = '';
+    var f = followTeam();
+    if (!f) {
+      var p0 = h('section', 'panel'); root.appendChild(p0);
+      p0.appendChild(h('p', 'ax', 'Pick your team and this page shows its next game, the live score while it plays, its injury report and its numbers.'));
+      var sel = document.createElement('select'); sel.className = 'minesel'; sel.appendChild(new Option('Choose a team…', ''));
+      (state.teams || []).map(function (t) { return t.team; }).sort().forEach(function (t) { sel.appendChild(new Option(t, t)); });
+      sel.onchange = function () { if (!sel.value) return; try { localStorage.setItem('ps.follow', sel.value); } catch (e) {} buildMine(); };
+      p0.appendChild(sel);
+      return;
+    }
+    document.getElementById('mineTitle').textContent = f;
+    var top = h('section', 'panel'), live = h('section', 'panel'), inj = h('section', 'panel'), nums = h('section', 'panel');
+    [top, live, inj, nums].forEach(function (s) { root.appendChild(s); });
+    top.appendChild(h('h3', 'fdh', 'Next game')); p5Loading(top);
+    scGet('api/matchups-data').then(function (D) {
+      top.innerHTML = ''; top.appendChild(h('h3', 'fdh', 'Next game'));
+      var g = nextGame(D, f);
+      if (!g) top.appendChild(h('p', 'ax', f + ' has no game left on the schedule.'));
+      else { var home = siteName(g[2]), away = siteName(g[3]); top.appendChild(weekCard(D, g, home, away, psModel(D, home, away, !!g[4]), true)); }
+      alertsButton(top);
+    }).catch(function (e) { p5Fail(top, e); });
+    xGet('live', { t: Math.floor(Date.now() / 60000) }).then(function (j) {
+      var g = (j.games || []).filter(function (x) { return x.home === f || x.away === f; })[0];
+      if (!g || g.status === 'scheduled') { live.hidden = true; return; }
+      live.appendChild(h('h3', 'fdh', g.status === 'completed' ? 'Final' : 'Live'));
+      live.appendChild(h('p', 'minescore', g.away + ' ' + g.ap + ' · ' + g.home + ' ' + g.hp + (g.status === 'in_progress' ? '  (' + (g.q > 4 ? 'OT' : 'Q' + g.q) + ' ' + String(g.clock || '').replace(/^00:/, '') + ')' : '')));
+      if (g.last) live.appendChild(h('p', 'tblnote', g.last));
+    }).catch(function () { live.hidden = true; });
+    inj.appendChild(h('h3', 'fdh', 'Injury report'));
+    xGet('injuries', { teams: f }).then(function (list) {
+      if (!list.length) { inj.appendChild(h('p', 'ax', 'No injury reports in the last ten days.')); return; }
+      var ul = h('ul', 'minelist');
+      list.forEach(function (x) { var li = h('li'); li.appendChild(h('b', null, x.player)); li.appendChild(document.createTextNode(' · ' + (INJ_LABEL[x.status] || x.status) + ' · ' + x.headline)); ul.appendChild(li); });
+      inj.appendChild(ul);
+    }).catch(function (e) { p5Fail(inj, e); });
+    nums.appendChild(h('h3', 'fdh', 'Season so far'));
+    xGet('review', { team: f, season: state.season }).then(function (r) {
+      var a = r.adj || {};
+      p5Cards(nums, [['Record', r.record || '–', 'against the spread ' + (r.ats || '–')],
+        ['Offense', a.Offense ? '#' + a.Offense.rk : '–', 'schedule-adjusted EPA per play'],
+        ['Defense', a.Defense ? '#' + a.Defense.rk : '–', 'schedule-adjusted EPA per play']]);
+      var go = h('a', 'navlink', 'Full ' + f + ' page →'); go.href = '?team=' + encodeURIComponent(f); nums.appendChild(go);
+      var ch = h('button', 'navlink', 'Change team'); ch.type = 'button'; ch.onclick = function () { try { localStorage.removeItem('ps.follow'); } catch (e) {} buildMine(); }; nums.appendChild(ch);
+    }).catch(function (e) { p5Fail(nums, e); });
+  }
+  /* let phones save the site to the home screen, opening on My team */
+  (function homeScreen() {
+    try {
+      var m = { name: 'The Post-Snap', short_name: 'Post-Snap', start_url: location.origin + location.pathname + '?view=mine', display: 'standalone', background_color: '#f3f5f8', theme_color: '#1f4fbf', icons: [] };
+      var fav = document.querySelector('link[rel="icon"]'); if (fav) m.icons.push({ src: fav.href, sizes: 'any' });
+      var l = document.createElement('link'); l.rel = 'manifest'; l.href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(m)); document.head.appendChild(l);
+      [['apple-mobile-web-app-capable', 'yes'], ['apple-mobile-web-app-title', 'Post-Snap'], ['mobile-web-app-capable', 'yes']].forEach(function (x) { var me = document.createElement('meta'); me.name = x[0]; me.content = x[1]; document.head.appendChild(me); });
+    } catch (e) {}
+  })();
+
+  /* ---- team page: the season so far, in one panel ---- */
+  function buildReview() {
+    var host = document.getElementById('reviewBody'); if (!host) return;
+    var team = state.team; p5Loading(host);
+    xGet('review', { team: team, season: state.season }).then(function (r) {
+      if (team !== state.team) return;
+      host.innerHTML = '';
+      function gameTxt(x) { return x ? 'Week ' + x.week + ' vs ' + x.opp + ': ' + sgn(+x.adj, 2) + ' adjusted EPA (#' + x.rk + ' of ' + x.pool + ')' : '–'; }
+      var cards = [['Record', r.record || '–', 'against the spread ' + (r.ats || '–')],
+        ['Best offensive game', r.best_off ? r.best_off.opp : '–', gameTxt(r.best_off)],
+        ['Best defensive game', r.best_def ? r.best_def.opp : '–', gameTxt(r.best_def)]];
+      if (r.upset) cards.push(['Biggest upset win', r.upset.opp, 'won by ' + r.upset.mg + ' as a ' + num(r.upset.line, 1) + '-point underdog']);
+      if (r.cover) cards.push(['Beat the line by the most', r.cover.opp, (r.cover.mg > 0 ? 'won by ' + r.cover.mg : 'lost by ' + -r.cover.mg) + ', ' + num(r.cover.by, 1) + ' better than the line']);
+      if (r.worst && r.worst.by < 0) cards.push(['Furthest below the line', r.worst.opp, (r.worst.mg > 0 ? 'won by ' + r.worst.mg : 'lost by ' + -r.worst.mg) + ', ' + num(-r.worst.by, 1) + ' worse than the line']);
+      if (r.qb) cards.push(['Quarterback', r.qb.qb.split(',').reverse().map(function (s) { return s.charAt(0).toUpperCase() + s.slice(1); }).join('. '), sgn(+r.qb.epa, 2) + ' EPA per dropback · #' + r.qb.rk + ' of ' + r.qb.pool]);
+      if (r.target) cards.push(['Go-to target', r.target.who, Math.round(r.target.tgts) + ' targets · ' + pct(+r.target.share, 0) + ' of the team\'s']);
+      p5Cards(host, cards);
+      host.appendChild(h('p', 'tblnote', 'Pulled from the rest of the site: game grades from Best and worst games, quarterback and target numbers from the player pages, records against the closing line. After the bowls this becomes the season in review.'));
+    }).catch(function (e) { p5Fail(host, e); });
+  }
+
+  /* ---- report card: when the model said 70%, did 70% win? ---- */
+  function drawCalib(host, D) {
+    var R = D.report || [], sig = (D.bench && D.bench.sigma) || 15.5; if (R.length < 80) return;
+    var B = [[0.5, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9], [0.9, 1.01]].map(function (b) { return { lo: b[0], hi: b[1], n: 0, w: 0, p: 0 }; });
+    R.forEach(function (r) {
+      var p = phi(r[4] / sig), fav = p >= 0.5 ? 1 : 0, pf = Math.max(p, 1 - p), won = fav ? r[6] > 0 : r[6] < 0;
+      if (r[6] === 0) return;
+      B.forEach(function (b) { if (pf >= b.lo && pf < b.hi) { b.n++; b.p += pf; if (won) b.w++; } });
+    });
+    host.appendChild(h('h3', 'fdh', 'Is the model\'s confidence right?'));
+    var W = 520, H = 260, L = 46, Rt = 14, T = 14, Bm = 36;
+    var X = function (v) { return L + (W - L - Rt) * (v - 0.5) / 0.5; }, Y = function (v) { return T + (H - T - Bm) * (1 - (v - 0.5) / 0.5); };
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'histsvg', role: 'img', 'aria-label': 'Predicted against actual win rate' });
+    [0.5, 0.6, 0.7, 0.8, 0.9, 1].forEach(function (v) {
+      svg.appendChild(el('line', { x1: L, x2: W - Rt, y1: Y(v), y2: Y(v), class: 'hgrid' }));
+      svg.appendChild(el('text', { x: L - 6, y: Y(v) + 4, 'text-anchor': 'end', class: 'hax' }, Math.round(v * 100) + '%'));
+      svg.appendChild(el('text', { x: X(v), y: H - 14, 'text-anchor': 'middle', class: 'hax' }, Math.round(v * 100) + '%'));
+    });
+    svg.appendChild(el('path', { d: 'M' + X(0.5) + ' ' + Y(0.5) + 'L' + X(1) + ' ' + Y(1), class: 'hnat' }));
+    B.filter(function (b) { return b.n >= 5; }).forEach(function (b) {
+      var px = b.p / b.n, py = b.w / b.n;
+      svg.appendChild(el('circle', { cx: X(px), cy: Y(Math.max(0.5, py)), r: 4 + Math.min(8, Math.sqrt(b.n)), class: 'hdot' }));
+      svg.appendChild(el('text', { x: X(px), y: Y(Math.max(0.5, py)) - 14, 'text-anchor': 'middle', class: 'hlab' }, Math.round(py * 100) + '% of ' + b.n));
+    });
+    var box = h('div', 'histchart'); box.appendChild(svg); host.appendChild(box);
+    host.appendChild(h('p', 'tblnote', 'Each dot groups games by how sure the model was of its favorite (across) and shows how often that favorite won (up; bigger dots are more games). On the dashed line, the model\'s percentages mean what they say; above it the model was too timid, below it too confident. Same honest test as above: each week predicted only from earlier games.'));
+  }
+
+  /* =====================================================================
      Views. The team page is one thing; a weekly slate and league-wide
      tables are another shape entirely, so they get their own screens
      behind a switcher rather than being bolted on as more panels.
      ===================================================================== */
   var VIEWS = [
     { id: 'team',    label: 'Team',    el: 'viewTeam' },
+    { id: 'mine',    label: 'My team', el: 'viewMine' },
     { id: 'week',    label: 'This week', el: 'viewWeek' },
     { id: 'live',    label: 'Live', el: 'viewLive' },
     { id: 'games',   label: 'Games',   el: 'viewGames' },
@@ -4401,6 +4573,7 @@
     if (id === 'live') buildLive(); else clearTimeout(liveTimer);
     if (id === 'odds') buildOdds();
     if (id === 'glossary') buildGlossary();
+    if (id === 'mine') buildMine();
     if (id === 'box') buildBox();
     if (id === 'scout') buildScout();
     if (id === 'player') buildPlayer();
