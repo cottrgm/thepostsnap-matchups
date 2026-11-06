@@ -4763,7 +4763,10 @@
     var me = rows.filter(function (r) { return r.team === team; })[0];
     if (!me || me[key] === null || me[key] === undefined) return { v: me ? me[key] : null };
     var pool = rows.filter(function (r) { return r.qualified !== false && r[key] !== null && r[key] !== undefined; });
-    if (!good) return { v: me[key], pool: pool.length };
+    if (!good) {  /* a tendency: rank by "most", shown in a neutral color because more is not better */
+      var more = pool.filter(function (r) { return r.team !== team && r[key] > me[key]; }).length;
+      return { v: me[key], rank: more + 1, pool: pool.length + (pool.some(function (r) { return r.team === team; }) ? 0 : 1), neutral: true };
+    }
     var better = pool.filter(function (r) { return r.team !== team && (good > 0 ? r[key] > me[key] : r[key] < me[key]); }).length;
     return { v: me[key], rank: better + 1, pool: pool.length + (pool.some(function (r) { return r.team === team; }) ? 0 : 1) };
   }
@@ -4771,11 +4774,25 @@
     var td = h('td', 'scv');
     td.appendChild(h('span', 'scnum', scFmt(fmt, m.v)));
     if (m.rank) {
-      var b = h('span', 'scrk', '#' + m.rank);
-      b.title = m.rank + ' of ' + m.pool + ' FBS teams';
+      var b = h('span', 'scrk' + (m.neutral ? ' neu' : ''), '#' + m.rank + (m.neutral ? ' most' : ''));
+      b.title = m.neutral ? m.rank + ' of ' + m.pool + ' FBS teams, counting from the most (a style, not a grade)' : m.rank + ' of ' + m.pool + ' FBS teams';
       td.appendChild(b);
-      td.style.boxShadow = 'inset 4px 0 0 ' + shade(1 - (m.rank - 1) / Math.max(1, m.pool - 1));
+      td.style.boxShadow = 'inset 4px 0 0 ' + (m.neutral ? 'var(--muted)' : shade(1 - (m.rank - 1) / Math.max(1, m.pool - 1)));
     }
+    return td;
+  }
+  /* a tendency row: where each side sits on the FBS scale, no winner */
+  function scTend(o, d, off, def, key) {
+    var td = h('td', 'scedge');
+    if (!o.rank || !d.rank) { td.textContent = '–'; return td; }
+    var po = 1 - (o.rank - 1) / Math.max(1, o.pool - 1), pd = 1 - (d.rank - 1) / Math.max(1, d.pool - 1);
+    var bar = h('span', 'sctend');
+    [[po, 'o', off], [pd, 'd', def]].forEach(function (x) { var dot = h('i', x[1]); dot.style.left = (x[0] * 100).toFixed(1) + '%'; dot.title = x[2]; bar.appendChild(dot); });
+    td.appendChild(bar);
+    var gap = po - pd, word = key === 'pass_rate' ? (gap > 0 ? 'throws more than ' + def + ' usually sees' : 'throws less than ' + def + ' usually sees')
+      : (gap > 0 ? 'plays faster than ' + def + '\'s usual opponent' : 'plays slower than ' + def + '\'s usual opponent');
+    td.appendChild(h('span', 'sclean', Math.abs(gap) < 0.15 ? 'similar' : off + ' ' + word));
+    td.title = 'A style, not an edge: left is the fewest in FBS, right the most. ' + off + ' offense at the ' + Math.round(po * 100) + 'th percentile, ' + def + ' defense at the ' + Math.round(pd * 100) + 'th.';
     return td;
   }
   /* which side of this matchup has the better national standing */
@@ -4789,7 +4806,7 @@
     var lvl = Math.abs(e) < 0.08 ? 0 : Math.abs(e) < 0.2 ? 1 : 2;
     fill.className = lvl === 0 ? 'n' : e >= 0 ? 'o' : 'd';
     bar.appendChild(fill); td.appendChild(bar);
-    var lean = h('span', 'sclean', lvl === 0 ? 'even' : (lvl === 1 ? 'slight, ' : '') + (e > 0 ? 'offense' : 'defense'));
+    var lean = h('span', 'sclean', (lvl === 0 ? 'even' : (lvl === 1 ? 'slight, ' : '') + (e > 0 ? 'offense' : 'defense')) + ' · ' + Math.round(po * 100) + ' vs ' + Math.round(pd * 100));
     lean.dataset.side = lvl === 0 ? '' : e > 0 ? 'offense' : 'defense';
     td.appendChild(lean);
     td.title = 'Offense at the ' + Math.round(po * 100) + 'th percentile, defense at the ' + Math.round(pd * 100) + 'th: ' + (lvl === 0 ? 'within 8 points, even' : Math.round(Math.abs(e) * 100) + ' points apart');
@@ -4896,7 +4913,7 @@
       var o = scRank(offRows, off, m[0], m[3]), d = scRank(defRows, def, m[0], -m[3]);
       var tr = h('tr'); tr.appendChild(h('td', 'pclab', m[1]));
       tr.appendChild(scRankCell(o, m[2])); tr.appendChild(scRankCell(d, m[2]));
-      if (m[3]) tr.appendChild(scEdge(o, d)); else { var sx = h('td', 'scedge nd', '—'); sx.title = 'A tendency, not a strength: passing more or playing faster is not better or worse by itself, so neither side gets an edge here.'; tr.appendChild(sx); }
+      if (m[3]) tr.appendChild(scEdge(o, d)); else tr.appendChild(scTend(o, d, off, def, m[0]));
       tb.appendChild(tr);
     });
     var MO = (exO && exO.metrics) || {}, MD = (exD && exD.metrics) || {};
@@ -4913,7 +4930,7 @@
     t.appendChild(tb); wrap.appendChild(t); host.appendChild(wrap);
     var oWins = 0, dWins = 0;
     [].forEach.call(tb.querySelectorAll('.sclean'), function (x) { if (x.dataset.side === 'offense') oWins++; else if (x.dataset.side === 'defense') dWins++; });
-    host.appendChild(h('p', 'tblnote', off + '\'s offense ranks better on ' + oWins + ' of these measures, ' + def + '\'s defense on ' + dWins + ' (counting slight edges); the rest are even. Edge compares national percentiles: within 8 points = even, 8-20 apart = slight, 20+ = a clear edge. ' +
+    host.appendChild(h('p', 'tblnote', off + '\'s offense ranks better on ' + oWins + ' of these measures, ' + def + '\'s defense on ' + dWins + ' (counting slight edges); the rest are even. Edge compares national percentiles (100 = best in FBS, shown as offense vs defense): within 8 points = even, 8-20 apart = slight, 20+ = a clear edge. Pass rate and pace are styles, not strengths, so their rows show where each side sits from fewest (left) to most (right) instead of an edge. ' +
       'Season to date, all opponents. Ranks come from every FBS team on the same side of the ball.'));
   }
 
@@ -4945,7 +4962,7 @@
       tb.appendChild(tr);
     });
     t.appendChild(tb); wrap.appendChild(t); host.appendChild(wrap);
-    host.appendChild(h('p', 'tblnote', 'Small grey numbers are plays. Success-rate shading compares with the FBS average in the same situation (blue = better for that unit). For the full breakdown open either team page, Playcalling tab.'));
+    host.appendChild(h('p', 'tblnote', 'Small grey numbers are plays. Success-rate shading compares with the FBS average in the same situation (blue = better for that unit); situations with fewer than 10 plays are left unshaded because a handful of snaps says little. For the full breakdown open either team page, Playcalling tab.'));
   }
 
   function scZones(host, off, def, ZO, ZD) {

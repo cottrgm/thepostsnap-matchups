@@ -1,0 +1,7 @@
+
+/* ---- tendency rows: two markers on a fewest-to-most scale ---- */
+.sctend { position: relative; display: block; height: 10px; margin: 4px 0 3px; border-radius: 5px; background: linear-gradient(90deg, var(--surface-2), var(--line)); }
+.sctend i { position: absolute; top: -2px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid var(--surface-1); }
+.sctend i.o { background: var(--s1); }
+.sctend i.d { background: var(--s2); }
+.scrk.neu { background: var(--surface-2); color: var(--ink-2); }
