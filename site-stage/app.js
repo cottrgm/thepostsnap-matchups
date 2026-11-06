@@ -4791,7 +4791,7 @@
     td.appendChild(bar);
     var gap = po - pd, word = key === 'pass_rate' ? (gap > 0 ? 'throws more than ' + def + ' usually sees' : 'throws less than ' + def + ' usually sees')
       : (gap > 0 ? 'plays faster than ' + def + '\'s usual opponent' : 'plays slower than ' + def + '\'s usual opponent');
-    td.appendChild(h('span', 'sclean', Math.abs(gap) < 0.15 ? 'similar' : off + ' ' + word));
+    td.appendChild(h('span', 'sclean', Math.abs(gap) < 0.2 ? 'similar' : off + ' ' + word));
     td.title = 'A style, not an edge: left is the fewest in FBS, right the most. ' + off + ' offense at the ' + Math.round(po * 100) + 'th percentile, ' + def + ' defense at the ' + Math.round(pd * 100) + 'th.';
     return td;
   }
