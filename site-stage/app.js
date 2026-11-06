@@ -3819,7 +3819,8 @@
     box.appendChild(h('h3', 'fdh', 'Projected bracket'));
     var cols = h('div', 'bkcols');
     var c1 = h('div', 'bkcol'), c2 = h('div', 'bkcol'), c3 = h('div', 'bkcol'), c4 = h('div', 'bkcol');
-    [c1, c2, c3, c4].forEach(function (c, k) { c.appendChild(h('p', 'bkhead', ['First round (on campus)', 'Quarterfinals', 'Semifinals', 'Final'][k])); cols.appendChild(c); });
+    ['First round (on campus)', 'Quarterfinals', 'Semifinals', 'Final'].forEach(function (t) { cols.appendChild(h('p', 'bkhead', t)); });
+    [c1, c2, c3, c4].forEach(function (c) { cols.appendChild(c); });
     var F = field;
     var r1 = [game(F[7], F[8], 1, '9 at 8'), game(F[4], F[11], 1, '12 at 5'), game(F[5], F[10], 1, '11 at 6'), game(F[6], F[9], 1, '10 at 7')];
     r1.forEach(function (g) { c1.appendChild(g.el); });

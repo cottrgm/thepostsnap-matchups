@@ -1,0 +1,4 @@
+
+/* bracket: headers on their own row so every round shares one height and later rounds center between their feeders */
+.bkcols { grid-template-rows: auto 1fr; align-items: stretch; row-gap: 8px; }
+.bkcol { justify-content: space-around; height: 100%; }
