@@ -224,7 +224,7 @@
      deeper numbers) share one filter bar and one offense/defense switch, and only load when
      their tab is open. The address bar always holds the current view, so a link reopens it. */
   var TEAM_TABS = [
-    { id: 'overview', label: 'Overview', nums: ['01', '21', '20', '02', '03', '07', '16'] },
+    { id: 'overview', label: 'Overview', nums: ['01', '21', '20', '30', '02', '03', '07', '16'] },
     { id: 'playcalling', label: 'Playcalling', nums: ['12', '13', '23', '24', '29', '06'] },
     { id: 'field', label: 'On the field', nums: ['14', '05'] },
     { id: 'units', label: 'Players & units', nums: ['15', '22', '27', '28', '17', '08'] },
@@ -266,7 +266,7 @@
   function muQueue() { if (muQueued) return; muQueued = true; setTimeout(function () { muQueued = false; muView(); }, 60); }
   window.addEventListener('scroll', muQueue, { passive: true });
   window.addEventListener('resize', muQueue);
-  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); } };
+  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); } };
   state.teamTab = state.teamTab || 'overview'; state.gSide = state.gSide || 0;
   state.liveKey = 0; state.liveDone = {};
 
@@ -3093,6 +3093,7 @@
     if (!g.played) scRest(g, A, B);
     scTravel(g, A, B);
     scWeather(g, A, B);
+    scSeries(g, A, B);
     setTimeout(addShareButtons, 50);
     var side = function (team, sd) { return 'team=' + encodeURIComponent(team) + '&season=' + s + '&side=' + sd; };
     var dir = 0;
@@ -3283,6 +3284,7 @@
         else {
           var home = siteName(g[2]), away = siteName(g[3]), mm = psModel(D, home, away, !!g[4]);
           mineB.appendChild(weekCard(D, g, home, away, mm, true));
+          alertsButton(mineB);
         }
       }
       /* games to watch */
@@ -3422,6 +3424,7 @@
       var games = j.games || [];
       var live = games.filter(function (g) { return g.status === 'in_progress'; }), soon = games.filter(function (g) { return g.status === 'scheduled'; }),
         done = games.filter(function (g) { return g.status === 'completed'; });
+      if (!document.querySelector('.alertbtn')) alertsButton(document.getElementById('liveStamp').parentNode);
       document.getElementById('liveStamp').textContent = j.updated ? 'Updated ' + new Date(j.updated).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + ' · refreshes every minute' : '';
       function section(title, list, kind) {
         if (!list.length) return;
@@ -3915,7 +3918,7 @@
         ['Stops', String(stops.length), stops.join(' → ')],
         ['Against the spread', aw + al ? aw + '-' + al : '–', aw + al ? pct(aw / (aw + al), 0) + ' (2014 on)' : 'no lines on file'],
         ['Development', devs.length ? sgn(devs.reduce(function (s, r) { return s + r.dev; }, 0) / devs.length, 3) : '–', 'average efficiency above what his rosters\' talent predicts']]);
-      var X = tbl(['Season', 'Team', 'Record', 'Final rank', 'SP+', 'Talent rank', 'Class rank', 'Development', 'Wins above expected', 'ATS', '4th-down "go" spots taken']);
+      var X = tbl(['Season', 'Team', 'Record', 'Final rank', 'SP+', 'Talent rank', 'Class rank', 'Development', 'Wins above expected', 'ATS', '4th-down "go" spots taken', '4th-down tries a game (made)']);
       S.slice().reverse().forEach(function (r) {
         var tr = h('tr'); tr.appendChild(td('nd', r.season)); tr.appendChild(td('pclab', r.team));
         tr.appendChild(td('nd', r.games ? r.wins + '-' + r.losses + (r.ties ? '-' + r.ties : '') : '–'));
@@ -3925,10 +3928,11 @@
         tr.appendChild(td('nd', r.wae != null ? sgn(r.wae, 1) : '–'));
         tr.appendChild(td('nd', r.ats_w != null && (r.ats_w + r.ats_l) ? r.ats_w + '-' + r.ats_l : '–'));
         tr.appendChild(td('nd', r.go_spots ? r.went + ' of ' + r.go_spots : '–'));
+        tr.appendChild(td('nd', r.fd_tpg != null ? num(+r.fd_tpg, 1) + ' (' + r.fd_conv + ' of ' + r.fd_tries + ')' : '–'));
         X.tb.appendChild(tr);
       });
       body.appendChild(X.wrap);
-      body.appendChild(h('p', 'tblnote', 'Development and wins above expected are the same numbers as the Development table: opponent-adjusted net efficiency (EPA per play) against what the roster\'s recruited talent predicts, and wins against what its schedule predicts. Rankings, SP+ and ATS start in 2014, fourth-down grades in 2025. The current season\'s record is to date.'));
+      body.appendChild(h('p', 'tblnote', 'Development and wins above expected are the same numbers as the Development table: opponent-adjusted net efficiency (EPA per play) against what the roster\'s recruited talent predicts, and wins against what its schedule predicts. Rankings, SP+ and ATS start in 2014, fourth-down tries in 2021 and fourth-down grades ("go" spots, from the expected-points model) in 2025. The current season\'s record is to date.'));
     }).catch(function (e) { p5Fail(body, e); });
   }
 
@@ -4069,6 +4073,7 @@
         host.appendChild(X.wrap);
       });
       host.appendChild(h('p', 'tblnote', 'From the conference availability reports and team news, collected every hour through RotoWire\'s injury wire, plus reports added by hand when a major one breaks. Status is read from the report\'s wording. Players ruled out are marked "(out)" in the tables above, and the matchup board drops them from the Two-Deep at its next rebuild.'));
+      injImpact(host, list, A, B);
       var outs = list.filter(function (x) { return x.status === 'out' || x.status === 'season'; });
       function flag() {
         var root = document.getElementById('scoutBody') || document;
@@ -4215,6 +4220,129 @@
     host.appendChild(X.wrap);
     host.appendChild(h('p', 'tblnote', 'Snaps are this season\'s PFF snaps for the Three-Deep at each position group on the matchup board. Leaving means out of eligibility after this season or an announced transfer; players who could return for another year are not counted, and the portal will change this in December. Commits are the 2027 high-school class by the board\'s position groups.'));
   }
+
+  /* =====================================================================
+     Round 8: injury impact, series history, best and worst games,
+     receiver profiles, win-out playoff odds, score alerts.
+     ===================================================================== */
+
+  /* ---- injury impact: how big a role each missing player had ---- */
+  function injImpact(host, list, A, B) {
+    var outs = list.filter(function (x) { return x.status === 'out' || x.status === 'season' || x.status === 'doubtful'; });
+    if (!outs.length) return;
+    Promise.all([xGet('targets', { team: A, season: state.season }), xGet('targets', { team: B, season: state.season })]).then(function (r) {
+      var T = {}; [A, B].forEach(function (t, i) { T[t] = r[i] || []; });
+      [].forEach.call(host.querySelectorAll('tr'), function (tr) {
+        var c = tr.firstChild; if (!c || c.tagName !== 'TD') return;
+        var tbl0 = tr.closest('.tablewrap'), h3 = tbl0 && tbl0.previousElementSibling, team = h3 && h3.textContent;
+        var x = outs.filter(function (o) { return o.player === c.textContent && o.team === team; })[0]; if (!x) return;
+        var hit = (T[team] || []).filter(function (y) { return plSame(y.target, x.player); })[0], m = hit && hit.m;
+        if (m && m.tgts) c.appendChild(h('span', 'injrole', Math.round(m.tgts.v) + ' targets, ' + pct(m.share.v, 0) + ' of the team\'s' + (m.epa_t && m.epa_t.rk ? ' · #' + m.epa_t.rk + ' in EPA per target' : '')));
+      });
+    }).catch(function () {});
+  }
+
+  /* ---- scouting: the series since 2014 ---- */
+  function scSeries(g, A, B) {
+    xGet('series', { a: A, b: B }).then(function (j) {
+      var tiles = document.getElementById('scoutTiles'); if (!tiles || !j || !j.n) return;
+      var G = (j.games || []).filter(function (x) { return !(g.played && x.s === state.season && x.hp === g.home_points && x.ap === g.away_points); });
+      var d = h('div', 'tile'); d.appendChild(h('span', 'k', 'Series since 2014'));
+      d.appendChild(h('span', 'v resttxt', j.a_w > j.b_w ? A + ' ' + j.a_w + '–' + j.b_w : j.b_w > j.a_w ? B + ' ' + j.b_w + '–' + j.a_w : 'Even ' + j.a_w + '–' + j.b_w));
+      var last = G.slice(0, 3).map(function (x) { var hw = x.hp > x.ap; return x.s + ' ' + (hw ? x.home : x.away) + ' ' + Math.max(x.hp, x.ap) + '–' + Math.min(x.hp, x.ap); });
+      d.appendChild(h('span', 'r', (j.a_ats + j.b_ats ? 'Against the spread: ' + A + ' ' + j.a_ats + '–' + j.b_ats + ' · ' : '') + (last.length ? 'Last: ' + last.join(', ') : '')));
+      tiles.appendChild(d);
+    }).catch(function () {});
+  }
+
+  /* ---- team page: every game, adjusted for the opponent, ranked against all games ---- */
+  function buildUnitGames() {
+    var host = document.getElementById('ugBody'); if (!host) return;
+    var team = state.team; p5Loading(host);
+    xGet('unit_games', { team: team, season: state.season }).then(function (rows) {
+      if (team !== state.team) return;
+      host.innerHTML = '';
+      if (!rows || !rows.length) { host.appendChild(h('p', 'ax', 'No FBS games for ' + team + ' this season.')); return; }
+      var wrap = h('div', 'portalcols');
+      ['Offense', 'Defense'].forEach(function (side) {
+        var R = rows.filter(function (r) { return r.side === side; }); if (!R.length) return;
+        var col = h('div', 'portalcol'); col.appendChild(h('h3', 'fdh', side));
+        var best = R.slice().sort(function (a, b) { return a.rk - b.rk; });
+        var X = tbl(['Wk', 'Opponent', 'EPA/play', 'Adjusted', 'Rank among all ' + side.toLowerCase() + 's']);
+        R.forEach(function (r) {
+          var tr = h('tr', 'clickable'); tr.appendChild(td('nd', r.week)); tr.appendChild(td('pclab', r.opp));
+          tr.appendChild(td('nd', sgn(+r.raw, 2))); tr.appendChild(td('nd', sgn(+r.adj, 2)));
+          var c = td('nd pcshade', '#' + r.rk + ' of ' + r.pool + (r === best[0] ? ' · best' : r === best[best.length - 1] ? ' · worst' : '')); c.style.background = xRankBg(r.rk, r.pool); tr.appendChild(c);
+          tr.onclick = function () { vstate.boxGame = r.game; setView('box'); };
+          X.tb.appendChild(tr);
+        });
+        col.appendChild(X.wrap); wrap.appendChild(col);
+      });
+      host.appendChild(wrap);
+      host.appendChild(h('p', 'tblnote', 'EPA per play in each game, then adjusted for how good that opponent is on the other side of the ball (the same schedule-adjusted ratings as the rest of the site). The rank puts each game against every FBS offense or defense game this season with at least 30 plays. On defense, lower EPA is better and ranks read that way. Tap a game for its box score.'));
+    }).catch(function (e) { p5Fail(host, e); });
+  }
+
+  /* ---- player page: a receiver's targets ---- */
+  function recProfile(root, j) {
+    var p = scPanel(root, '05', 'Target profile', 'Every pass thrown his way in the play-by-play, ranked against FBS receivers with 30 or more targets this season.');
+    p5Loading(p.body);
+    xGet('targets', { team: j.team, season: j.season }).then(function (list) {
+      var me = (list || []).filter(function (x) { return plSame(x.target, j.athlete); })[0];
+      p.body.innerHTML = '';
+      if (!me) { p.body.appendChild(h('p', 'ax', 'No targets matched to him in the play-by-play this season.')); return; }
+      var M = me.m, X = tbl(['', 'Him', 'FBS receiver average', 'Rank', 'Plays']);
+      [['Targets', 'tgts', 'n'], ['Share of team targets', 'share', 'p'], ['EPA per target', 'epa_t', 2], ['Success rate when targeted', 'sr', 'p'],
+       ['Yards per target', 'ypt', 1], ['Share of targets marked deep', 'deep_share', 'p'], ['EPA on deep targets', 'epa_deep', 2]].forEach(function (r) {
+        var x = M[r[1]]; if (!x) return;
+        var f = function (v) { return v == null ? '–' : r[2] === 'n' ? String(Math.round(v)) : r[2] === 'p' ? pct(+v, 1) : num(+v, r[2]); };
+        var tr = h('tr'); tr.appendChild(td('pclab', r[0])); tr.appendChild(td('nd', f(x.v))); tr.appendChild(td('nd', f(x.nat)));
+        var c = td('nd pcshade', x.rk ? '#' + x.rk + ' of ' + x.pool : '–'); if (x.rk) c.style.background = xRankBg(x.rk, x.pool); tr.appendChild(c);
+        tr.appendChild(td('nd', x.n)); X.tb.appendChild(tr);
+      });
+      p.body.appendChild(X.wrap);
+      p.body.appendChild(h('p', 'tblnote', 'A target is a pass the play-by-play says was thrown to him, complete or not. Success and EPA are the play\'s result for the offense. Catches, yards and touchdowns stay in the official numbers above.'));
+    }).catch(function (e) { p5Fail(p.body, e); });
+  }
+
+  /* ---- score alerts for the team you follow ---- */
+  var ALERT = { last: null, timer: null };
+  function alertsOn() { try { return localStorage.getItem('ps.alerts') === '1'; } catch (e) { return false; } }
+  function alertToast(msg) {
+    var t = document.getElementById('psToast');
+    if (!t) { t = h('div', 'pstoast viz-root'); t.id = 'psToast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+    t.textContent = msg; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(function () { t.hidden = true; }, 12000);
+    try { if (window.Notification && Notification.permission === 'granted' && document.hidden) new Notification('The Post-Snap', { body: msg }); } catch (e) {}
+  }
+  function pollAlerts() {
+    clearTimeout(ALERT.timer);
+    var f = followTeam(); if (!f || !alertsOn()) return;
+    xGet('live', { t: Math.floor(Date.now() / 60000) }).then(function (j) {
+      var g = (j.games || []).filter(function (x) { return (x.home === f || x.away === f) && x.status !== 'scheduled'; })[0];
+      if (g) {
+        var key = g.id + '|' + g.hp + '|' + g.ap + '|' + g.status;
+        if (ALERT.last && ALERT.last !== key && ALERT.last.split('|')[0] === String(g.id)) {
+          alertToast(g.status === 'completed' ? 'Final: ' + g.away + ' ' + g.ap + ', ' + g.home + ' ' + g.hp
+            : g.away + ' ' + g.ap + ', ' + g.home + ' ' + g.hp + ' · ' + (g.q > 4 ? 'OT' : 'Q' + g.q) + ' ' + String(g.clock || '').replace(/^00:/, ''));
+        }
+        ALERT.last = key;
+      }
+      ALERT.timer = setTimeout(pollAlerts, g && g.status === 'in_progress' ? 60000 : 300000);
+    }).catch(function () { ALERT.timer = setTimeout(pollAlerts, 300000); });
+  }
+  function alertsButton(host) {
+    var f = followTeam(); if (!host || !f) return;
+    var b = h('button', 'navlink alertbtn', alertsOn() ? 'Score alerts for ' + f + ': on' : 'Turn on score alerts for ' + f); b.type = 'button';
+    b.title = 'While this page is open, a note pops up when ' + f + ' scores or a game ends (and a browser notification if you allow it).';
+    b.onclick = function () {
+      var on = !alertsOn(); try { localStorage.setItem('ps.alerts', on ? '1' : '0'); } catch (e) {}
+      if (on && window.Notification && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) {} }
+      b.textContent = on ? 'Score alerts for ' + f + ': on' : 'Turn on score alerts for ' + f;
+      ALERT.last = null; pollAlerts();
+    };
+    host.insertBefore(b, host.firstChild);
+  }
+  setTimeout(pollAlerts, 4000);
 
   /* =====================================================================
      Views. The team page is one thing; a weekly slate and league-wide
@@ -4840,7 +4968,7 @@
 
     /* 04 snaps, recruiting, availability */
     var p4 = scPanel(root, role === 'def' ? '03' : '04', 'Snaps and recruiting', 'PFF snap counts and his recruiting ratings from each service, as used by the talent index and the matchup board.');
-    if (role === 'qb') qbProfile(root, j);
+    if (role === 'qb') qbProfile(root, j); else if (role === 'rec') recProfile(root, j);
     scGet('api/matchups-data').then(function (D) { plBoard(p4.body, j, D); })
       .catch(function (e) { p4.body.innerHTML = ''; p4.body.appendChild(h('p', 'ax', 'Could not load the matchup board data. ' + e.message)); });
     if (window.__tlRescan) window.__tlRescan();
@@ -5200,15 +5328,17 @@
     var out = { winsSum: new Float64Array(n), ccg: new Float64Array(n), champ: new Float64Array(n), cfp: new Float64Array(n), bye: new Float64Array(n), host: new Float64Array(n), seedSum: new Float64Array(n), semi: new Float64Array(n), fin: new Float64Array(n), title: new Float64Array(n), N: N };
     var W = new Float64Array(n), L = new Float64Array(n), CW = new Float64Array(n), CL = new Float64Array(n), score = new Float64Array(n), isChamp = new Uint8Array(n), RES = new Float64Array(n);
     var order = []; for (var k = 0; k < n; k++) order.push(k);
+    var LG = new Uint8Array(n), hasRem = new Uint8Array(n); rem.forEach(function (gg) { if (gg[0] >= 0) hasRem[gg[0]] = 1; if (gg[1] >= 0) hasRem[gg[1]] = 1; });
+    out.woN = new Float64Array(n); out.woC = new Float64Array(n); out.l1N = new Float64Array(n); out.l1C = new Float64Array(n);
     var done_ = 0, CH = 500;
     function chunk() {
       var end = Math.min(N, done_ + CH);
       for (var s = done_; s < end; s++) {
-        W.set(baseW); L.set(baseL); CW.set(baseCW); CL.set(baseCL); RES.set(base); isChamp.fill(0);
+        W.set(baseW); L.set(baseL); CW.set(baseCW); CL.set(baseCL); RES.set(base); isChamp.fill(0); LG.fill(0);
         for (var r = 0; r < rem.length; r++) {
           var gg = rem[r], hw = rnd() < gg[2], wi = hw ? gg[0] : gg[1], li = hw ? gg[1] : gg[0];
           if (wi >= 0) { W[wi]++; if (gg[3]) CW[wi]++; RES[wi] += winVal(li); }
-          if (li >= 0) { L[li]++; if (gg[3]) CL[li]++; RES[li] += lossVal(wi); }
+          if (li >= 0) { L[li]++; if (gg[3]) CL[li]++; RES[li] += lossVal(wi); LG[li]++; }
         }
         for (var c in confs) {
           var mem = confs[c].slice().sort(function (a, b) {
@@ -5229,6 +5359,7 @@
         for (var o = 0; o < n; o++) { var t2 = order[o]; if (G6[conf[t2]]) { if (!inF[t2]) { field.push(t2); inF[t2] = 1; } break; } }
         for (var o2 = 0; o2 < n && field.length < 12; o2++) { var t3 = order[o2]; if (!inF[t3]) { field.push(t3); inF[t3] = 1; } }
         field.forEach(function (t) { out.cfp[t]++; });
+        for (var i3 = 0; i3 < n; i3++) { if (!hasRem[i3]) continue; if (LG[i3] === 0) { out.woN[i3]++; if (inF[i3]) out.woC[i3]++; } else if (LG[i3] === 1) { out.l1N[i3]++; if (inF[i3]) out.l1C[i3]++; } }
         field.sort(function (a, b) { return score[b] - score[a]; });
         for (var sd = 0; sd < 4; sd++) out.bye[field[sd]]++;
         for (var sd2 = 4; sd2 < 8; sd2++) out.host[field[sd2]]++;
@@ -5258,11 +5389,12 @@
     }
     var rows = R.teams.map(function (t, i) {
       return { team: siteName(t), conf: R.conf[i], rec: R.W[i] + '-' + R.L[i], crec: R.CW[i] + '-' + R.CL[i], rt: R.rt[i],
-        wins: R.out.winsSum[i] / N, ccg: R.out.ccg[i] / N, champ: R.out.champ[i] / N, cfp: R.out.cfp[i] / N, bye: R.out.bye[i] / N, host: R.out.host[i] / N };
+        wins: R.out.winsSum[i] / N, ccg: R.out.ccg[i] / N, champ: R.out.champ[i] / N, cfp: R.out.cfp[i] / N, bye: R.out.bye[i] / N, host: R.out.host[i] / N,
+        wo: R.out.woN[i] >= 20 ? R.out.woC[i] / R.out.woN[i] : null, l1: R.out.l1N[i] >= 20 ? R.out.l1C[i] / R.out.l1N[i] : null };
     }).filter(function (r) { return oddsState.conf ? r.conf === oddsState.conf : r.cfp >= 0.005 || r.champ >= 0.05; });
     rows.sort(function (a, b) { return oddsState.conf ? (b.champ - a.champ) || (b.cfp - a.cfp) : (b.cfp - a.cfp) || (b.champ - a.champ); });
     host.innerHTML = '';
-    var X = tbl(['Team', 'Conf', 'Record', 'Conf rec', 'Proj. wins', 'Title game', 'Conf title', 'Playoff', 'First-round bye', 'Hosts a game']);
+    var X = tbl(['Team', 'Conf', 'Record', 'Conf rec', 'Proj. wins', 'Title game', 'Conf title', 'Playoff', 'First-round bye', 'Hosts a game', 'Playoff if they win out', 'If they lose once']);
     function pc(v) { var c = td('scv', v < 0.001 ? '–' : v > 0.995 ? '>99%' : v < 0.01 ? '<1%' : Math.round(v * 100) + '%'); if (v >= 0.01) c.style.boxShadow = 'inset ' + Math.max(4, Math.round(v * 60)) + 'px 0 0 color-mix(in srgb, var(--s1) 28%, transparent)'; return c; }
     rows.forEach(function (r) {
       var tr = h('tr', 'clickable');
@@ -5276,6 +5408,7 @@
         }
         tr.appendChild(cell);
       });
+      [r.wo, r.l1].forEach(function (v) { tr.appendChild(v == null ? td('nd', '–') : pc(v)); });
       tr.onclick = function () { loadTeam(r.team, 'team'); };
       X.tb.appendChild(tr);
     });
@@ -5285,7 +5418,7 @@
     document.getElementById('oddsNote').textContent = 'Based on ' + N.toLocaleString() + ' simulations of the ' + R.remaining + ' regular-season games left, then every conference title game and a 12-team field. ' +
       'Each game is a coin weighted by the matchup board\'s Two-Deep model (talent plus results, ' + 'home field included); title-game spots go to the top two in conference winning percentage. ' +
       'The field follows the 2026 rules: the ACC, Big Ten, Big 12 and SEC champions, the highest-ranked team from the other six conferences, and seven more by ranking. ' +
-      'The simulated ranking starts from the current CFP ranking and moves with each result: a win counts more against a strong opponent, a loss costs less against one (weights fitted to how the committee has ranked this season so far), plus a small bonus for a conference title. It approximates the committee; it cannot read its mind. Tiebreakers beyond winning percentage are not modeled. Re-runs every time the page loads.';
+      'The simulated ranking starts from the current CFP ranking and moves with each result: a win counts more against a strong opponent, a loss costs less against one (weights fitted to how the committee has ranked this season so far), plus a small bonus for a conference title. It approximates the committee; it cannot read its mind. Tiebreakers beyond winning percentage are not modeled. Re-runs every time the page loads. "Playoff if they win out" is how often a team makes the field in the simulations where it wins every regular-season game it has left; "if they lose once" is the same with exactly one loss (shown when that happens in at least 20 simulations).';
     if (!oddsState.wiSorted) { oddsState.wiSorted = true; try { buildWhatIf(); } catch (e) {} }
     if (window.__tlRescan) window.__tlRescan();
   }
