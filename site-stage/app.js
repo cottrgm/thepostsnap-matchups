@@ -2748,10 +2748,10 @@
 
   /* ---------------- pressure map (Players & units) ---------------- */
   var SPOTS = {
-    A: ['A gap', 'Between the center and a guard', 352, 186], B: ['B gap', 'Between a guard and a tackle', 296, 186],
-    OT: ['Over the tackle', 'Head-up or shaded on a tackle', 240, 186], EDGE: ['Edge', 'Outside the tackle', 176, 186],
-    BOX: ['Box (off the ball)', 'Linebacker depth inside the box', 318, 112], SLOT: ['Slot', 'Over a slot receiver', 156, 112],
-    WIDE: ['Wide', 'Outside corner', 62, 140], DEEP: ['Deep', 'Safety depth', 380, 44]
+    A: ['A gap', 'Between the center and a guard', 366, 186], B: ['B gap', 'Between a guard and a tackle', 290, 186],
+    OT: ['Over the tackle', 'Head-up or shaded on a tackle', 218, 186], EDGE: ['Edge', 'Outside the tackle', 136, 186],
+    BOX: ['Box (off the ball)', 'Linebacker depth inside the box', 318, 98], SLOT: ['Slot', 'Over a slot receiver', 176, 96],
+    WIDE: ['Wide', 'Outside corner', 52, 120], DEEP: ['Deep', 'Safety depth', 430, 40]
   };
   function buildPressure() {
     var host = document.getElementById('prsBody'); if (!host) return;
@@ -2769,7 +2769,7 @@
     p5Cards(host, [
       ['Rushers per dropback', num(T.rushers, 2), 'FBS average ' + num(N.rushers, 2)],
       ['Blitzers per dropback', num(T.blitzers, 2), rk(T.blitz_rk, T.pool) + ' most · FBS ' + num(N.blitzers, 2)],
-      ['Pressures per dropback', pct(T.prate, 0), rk(T.prate_rk, T.pool) + ' · FBS ' + pct(N.prate, 0), T.prate_rk, T.pool],
+      ['Pressures credited per dropback', pct(T.prate, 0), rk(T.prate_rk, T.pool) + ' · FBS ' + pct(N.prate, 0), T.prate_rk, T.pool],
       ['Pressure per rush snap', pct(T.win, 1), rk(T.win_rk, T.pool) + ' · FBS ' + pct(N.win, 1), T.win_rk, T.pool]
     ]);
     var W = 760, H = 330, d = isDarkTheme();
@@ -2792,7 +2792,7 @@
         svg.appendChild(el('circle', { cx: x, cy: y, r: 7, fill: 'none', stroke: 'rgba(255,255,255,.35)', 'stroke-dasharray': '3 3' }));
         return;
       }
-      var r = 9 + 28 * Math.sqrt(v.rush / maxR), rate = v.prs / v.rush;
+      var r = 9 + 25 * Math.sqrt(v.rush / maxR), rate = v.prs / v.rush;
       var p = Math.max(0, Math.min(1, 0.5 + (rate - (N.win || 0.08)) / 0.16));
       var c = el('circle', { cx: x, cy: y, r: r, fill: shade(p), 'fill-opacity': .92, stroke: '#fff', 'stroke-width': 1.5 });
       svg.appendChild(c);
@@ -3060,13 +3060,13 @@
     host.appendChild(h('h3', 'fdh', off + '\'s protection against ' + def + '\'s pass rush'));
     var ol = PO.ol || {}, pr = PD.team || {};
     var P = tbl(['', off + ' offense', def + ' defense']);
-    [['Pass blocking / pass rush (PFF)', ol.pbg != null ? num(ol.pbg, 1) + ' grade, ' + rk(ol.pbg_rk, ol.pool) : '–', pr.prate != null ? pct(pr.prate, 0) + ' pressure per dropback, ' + rk(pr.prate_rk, pr.pool) : '–'],
+    [['Pass blocking / pass rush (PFF)', ol.pbg != null ? num(ol.pbg, 1) + ' grade, ' + rk(ol.pbg_rk, ol.pool) : '–', pr.prate != null ? pct(pr.prate, 0) + ' pressures credited per dropback, ' + rk(pr.prate_rk, pr.pool) : '–'],
      ['Sacks', PO.profile && PO.profile.sack_rate != null ? pct(PO.profile.sack_rate, 1) + ' of dropbacks' : '–', pr.sk != null ? num(pr.sk, 0) + ' sacks' : '–'],
      ['Blitzing', '', pr.blitzers != null ? num(pr.blitzers, 2) + ' blitzers per dropback, ' + rk(pr.blitz_rk, pr.pool) + ' most' : '–']].forEach(function (row) {
       var tr = h('tr'); row.forEach(function (v, i) { tr.appendChild(td(i ? 'nd' : 'pclab', v)); }); P.tb.appendChild(tr);
     });
     host.appendChild(P.wrap);
-    host.appendChild(h('p', 'tblnote', 'Zone and lane numbers are season to date. "' + def + ' allows there" ranks the defense nationally in that spot (#1 = toughest); soft spot = bottom third, strength = top fifth. Protection and pass rush come from PFF charting.'));
+    host.appendChild(h('p', 'tblnote', 'Zone and lane numbers are season to date. "' + def + ' allows there" ranks the defense nationally in that spot (#1 = toughest); soft spot = bottom third, strength = top fifth. Colors are from ' + off + '\'s side: blue = favorable for the offense, red = a tough spot. Protection and pass rush come from PFF charting.'));
   }
   function scSitu(host, off, def, O, Dd) {
     host.innerHTML = '';
@@ -3107,16 +3107,31 @@
     strip.innerHTML = '';
     scGet('api/matchups-data').then(function (D) {
       if (key !== state.team + '|' + state.season) return;
-      var g = nextGame(D, state.team); if (!g) { strip.hidden = true; return; }
-      strip.hidden = false;
+      var g = nextGame(D, state.team); if (!g) { strip.hidden = true; return null; }
+      return kickoffs(g[0]).then(function (K) { return [D, g, K]; });
+    }).then(function (x) {
+      if (!x || key !== state.team + '|' + state.season) return;
+      var D = x[0], g = x[1], K = x[2];
+      strip.hidden = false; strip.innerHTML = '';
       var home = siteName(g[2]), away = siteName(g[3]), me = state.team, opp = home === me ? away : home;
       var mm = psModel(D, home, away, !!g[4]);
       strip.appendChild(h('span', 'hnk', 'Next'));
-      strip.appendChild(h('span', 'hnv', new Date(g[1] + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + (g[4] ? 'vs ' : home === me ? 'vs ' : 'at ') + opp));
+      strip.appendChild(h('span', 'hnv', kickTxt(K[home + '|' + away], g[1]) + ' · ' + (g[4] ? 'vs ' : home === me ? 'vs ' : 'at ') + opp));
       if (mm) strip.appendChild(h('span', 'hnv', 'Post-Snap: ' + pickTxt(home, away, mm)));
       strip.appendChild(h('span', 'hnv', 'Line: ' + lineTxt(home, away, g[5])));
       var b = h('button', 'navlink', 'Preview →'); b.type = 'button'; b.onclick = function () { openPreview(g[0], home, away); }; strip.appendChild(b);
     }).catch(function () { strip.hidden = true; });
+  }
+  /* kickoff times for a week, keyed home|away (the board's dates are UTC days, so night games would read a day late) */
+  function kickoffs(week) {
+    return scGet('api/games?season=' + state.season + '&week=' + week).then(function (j) {
+      var m = {}; (j.games || []).forEach(function (g) { if (g.start_date) m[g.home_team + '|' + g.away_team] = g.start_date; }); return m;
+    }).catch(function () { return {}; });
+  }
+  function kickTxt(iso, fallback) {
+    if (!iso) return new Date(fallback + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    var d = new Date(iso);
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   }
   function nextGame(D, team) {
     var b = SC_BOARD_NAME[team] || team;
@@ -3136,6 +3151,9 @@
     [mineB, gamesB, digB, cardB].forEach(p5Loading);
     scGet('api/matchups-data').then(function (D) {
       var wk = Math.min.apply(null, (D.schedule || []).map(function (g) { return g[0]; }).concat([99]));
+      return kickoffs(wk).then(function (K) { weekKick = K; return [D, wk]; });
+    }).then(function (x) {
+      var D = x[0], wk = x[1];
       document.getElementById('weekEyebrow').textContent = state.season + ' season · week ' + (wk === 99 ? '–' : wk);
       /* your team */
       mineB.innerHTML = '';
@@ -3168,9 +3186,10 @@
     }).catch(function (e) { p5Fail(mineB, e); p5Fail(gamesB, e); p5Fail(cardB, e); });
     xGet('digest', { season: state.season }).then(function (j) { drawDigest(digB, j); }).catch(function (e) { p5Fail(digB, e); });
   }
+  var weekKick = {};
   function weekCard(D, g, home, away, mm, big) {
     var c = h('div', 'wkcard' + (big ? ' big' : ''));
-    var top = h('p', 'wkwhen', new Date(g[1] + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + (g[4] ? ' · neutral site' : ''));
+    var top = h('p', 'wkwhen', kickTxt(weekKick[home + '|' + away], g[1]) + (g[4] ? ' · neutral site' : ''));
     c.appendChild(top);
     var t = h('p', 'wkteams'); t.appendChild(h('span', null, away)); t.appendChild(h('span', 'scat', g[4] ? ' vs ' : ' at ')); t.appendChild(h('span', null, home)); c.appendChild(t);
     var row = h('div', 'wkrow');
