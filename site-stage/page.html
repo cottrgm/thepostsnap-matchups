@@ -375,6 +375,17 @@
 
     <section class="panel">
       <div class="phead">
+        <p class="num">28</p>
+        <div>
+          <h2>Next recruiting class</h2>
+          <p>Every high-school commitment in the next class, and where each one's rating would slot against the players taking the snaps at his position now.</p>
+        </div>
+      </div>
+      <div id="recruitBody"></div>
+    </section>
+
+    <section class="panel">
+      <div class="phead">
         <p class="num">16</p>
         <div>
           <h2>Against the spread</h2>
@@ -405,6 +416,7 @@
       </div>
       <div class="subctl"><div class="segs" role="tablist" id="yoyTabs"></div></div>
       <div id="yoyBody"></div>
+      <div id="histBody"></div>
     </section>
 
     <section class="panel" data-noshare>
@@ -660,6 +672,11 @@
 
 
   <footer class="foot">
+    <form id="nlForm" class="nlform" novalidate>
+      <label for="nlEmail"><b>The Post-Snap by email.</b> A weekly note with your team's numbers and the games worth watching. It has not launched yet; leave your address and the first one comes to you.</label>
+      <div class="nlrow"><input id="nlEmail" type="email" required autocomplete="email" placeholder="you@example.com" maxlength="254"><button type="submit">Sign up</button></div>
+      <p id="nlMsg" class="nlmsg" aria-live="polite"></p>
+    </form>
     <p class="src"><span class="wm-post">THE</span><span class="wm-snap">POST&#8202;SNAP</span> &middot; thepostsnap.com &middot; <a class="plink" href="?view=glossary">Glossary &amp; data notes</a></p>
   </footer>
 </div>
