@@ -2677,7 +2677,7 @@
     epa: ['EPA per play', 's2'], sr: ['Success rate', 'p1'], expl: ['Explosive play rate', 'p1'],
     epa_pass: ['EPA per dropback', 's2'], epa_run: ['EPA per run', 's2'], ppd: ['Points per drive', 'n2'], havoc: ['Havoc rate', 'p1']
   };
-  var XM_ORDER = ['epa', 'sr', 'expl', 'epa_pass', 'epa_run', 'ppd', 'havoc'];
+  var XM_ORDER = ['epa', 'sr', 'expl', 'epa_pass', 'epa_run'];
   function xGet(name, params) {
     var q = Object.keys(params).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
     return scGet('api/x/' + name + '?' + q);
@@ -2710,7 +2710,7 @@
       host.appendChild(cards);
       var T = tbl(['Measure', 'Offense, raw', 'Offense, adjusted', 'Defense, raw', 'Defense, adjusted']);
       XM_ORDER.forEach(function (k) {
-        var tr = h('tr'); tr.appendChild(td('pclab', XM[k][0] + (k === 'havoc' ? ' (forced on D, allowed on O)' : '')));
+        var tr = h('tr'); tr.appendChild(td('pclab', XM[k][0] + ''));
         ['Offense', 'Defense'].forEach(function (side) {
           var r = M[side][k];
           if (!r) { tr.appendChild(td('nd', '–')); tr.appendChild(td('nd', '–')); return; }
@@ -2739,7 +2739,7 @@
     var chart = h('div', 'trchart'); host.appendChild(chart);
     var note = h('p', 'tblnote'); host.appendChild(note);
     chart.appendChild(h('p', 'ax', 'Loading…'));
-    var keys = ['epa', 'sr', 'expl', 'ppd', 'havoc'];
+    var keys = ['epa', 'sr', 'expl', 'epa_pass', 'epa_run'];
     segs(sideSeg, ['Offense', 'Defense'], state.trSide, function (i) { state.trSide = i; buildTrend(); });
     segs(metSeg, keys.map(function (k) { return XM[k][0]; }), keys.indexOf(state.trMetric), function (i) { state.trMetric = keys[i]; buildTrend(); });
     xGet('trend', { team: team, season: s }).then(function (j) {
@@ -4987,8 +4987,6 @@
         ['expl', 'Explosive', P1, 'expl_rank'],
         ['epa_pass', 'Pass EPA', S2, 'epa_pass_rank'],
         ['epa_run', 'Run EPA', S2, 'epa_run_rank'],
-        ['ppd', 'Pts/drive', N2, 'ppd_rank'],
-        ['havoc', 'Havoc', P1, 'havoc_rank'],
         ['raw_rank', 'Raw rank', N0, null],
         ['move', 'Moved', N0, null]
       ] }
