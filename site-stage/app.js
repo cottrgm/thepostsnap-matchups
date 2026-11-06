@@ -2681,7 +2681,7 @@
       var games = (j.games || []).filter(function (g) { return byG[g.id]; });
       if (!games.length) { chart.appendChild(h('p', 'ax', 'No games charted yet.')); return; }
       var nat = j.nat ? +j.nat[met] : null, up = xHigherBetter(side, met);
-      var W = 900, H = 330, L = 64, R = 24, T = 26, B = 70, n = games.length;
+      var W = 900, H = 330, L = 64, R = 60, T = 26, B = 70, n = games.length;
       var vals = []; games.forEach(function (g) { vals.push(byG[g.id].raw, byG[g.id].adj); }); if (nat !== null) vals.push(nat);
       var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), pad = (hi - lo) * 0.12 || 0.05; lo -= pad; hi += pad;
       function X(i) { return n === 1 ? (L + W - R) / 2 : L + i * (W - L - R) / (n - 1); }
@@ -2720,7 +2720,7 @@
       leg.innerHTML = '<span class="trk adj"></span> Adjusted for the opponent &nbsp; <span class="trk raw"></span> As played &nbsp; <span class="trk nat"></span> FBS average';
       chart.insertBefore(leg, svg);
       var srow = (j.season || []).filter(function (r) { return r.side === side && r.metric === met; })[0];
-      note.innerHTML = state.team + ' ' + side.toLowerCase() + ', ' + XM[met][0].toLowerCase() + ', game by game. ' +
+      note.innerHTML = state.team + ' ' + side.toLowerCase() + ', ' + XM[met][0].replace(/^(?!EPA)./, function (x) { return x.toLowerCase(); }) + ', game by game. ' +
         (srow ? 'Season: <b>' + scFmt(f, srow.adj) + '</b> adjusted (#' + srow.adj_rank + '), ' + scFmt(f, srow.raw) + ' as played (#' + srow.raw_rank + '). ' : '') +
         'The adjusted line removes the strength of each opponent' + (side === 'Offense' ? '\'s defense' : '\'s offense') + ', so a dip against a top unit is not mistaken for a slump. ' +
         (up ? '' : 'Lower is better here, so the chart is flipped: up is always better. ') + 'Hover a game for its numbers.';
