@@ -4552,6 +4552,7 @@
       var n = document.getElementById(v.el);
       if (n) n.hidden = (v.id !== id);
     });
+    if (id === 'team' && state.team) document.title = state.team + ' · The Post-Snap';
     if (id !== 'team' && id !== 'scout' && id !== 'player' && id !== 'box') {
       var vb = document.querySelector('#viewNav [data-view="' + id + '"]');
       if (vb) document.title = vb.textContent.trim().replace(/^\w/, function (c) { return c.toUpperCase(); }) + ' · The Post-Snap';
