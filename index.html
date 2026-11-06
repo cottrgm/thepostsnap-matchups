@@ -710,7 +710,7 @@ if (window.__EMBED && window.parent !== window) {
   let VIEW = null;
   const sheetEl = document.getElementById('sheet');
   const place = () => { if (!sheetEl.open || !VIEW) return; const h = Math.max(240, VIEW.h - 32); sheetEl.style.top = (VIEW.top + 16) + 'px'; sheetEl.style.maxHeight = Math.min(820, h) + 'px'; };
-  new MutationObserver(place).observe(sheetEl, {attributes: true, attributeFilter: ['open']});
+  new MutationObserver(() => { if (sheetEl.open) window.parent.postMessage({psNeedView: 1}, location.origin); place(); }).observe(sheetEl, {attributes: true, attributeFilter: ['open']});
   window.addEventListener('message', e => {
     if (e.origin !== location.origin || !e.data) return;
     if (e.data.psTheme !== undefined) { const t = e.data.psTheme; if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); }
