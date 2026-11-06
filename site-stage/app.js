@@ -374,7 +374,8 @@
     var host = document.getElementById('dataStamp'); if (!host || !state.data) return;
     var f = state.data.freshness; if (!f || !f.max_week) { host.textContent = ''; return; }
     var when = f.last_load ? new Date(f.last_load).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
-    host.textContent = 'Data through week ' + f.max_week + (when ? ' · ' + when : '');
+    host.textContent = (when ? 'Updated ' + when + ' · ' : '') + 'week ' + f.max_week + ' games so far';
+    host.title = 'Play-by-play is re-pulled twice a day; games played since the last pull appear at the next one.';
   }
 
   /* ---- save any section as an image ---- */
