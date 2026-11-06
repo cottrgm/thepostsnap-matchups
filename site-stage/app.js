@@ -3471,7 +3471,7 @@
         if (!Object.keys(oddsState.force).length) { cnt.textContent = 'Pick at least one winner first.'; return; }
         oddsState.base = oddsState.base || oddsState.sims;
         run.disabled = true; run.textContent = 'Simulating…';
-        runSims(D, 6000, function (res) { oddsState.sims = res; run.disabled = false; run.textContent = 'Rerun the season'; paintOdds(); },
+        runSims(D, 10000, function (res) { oddsState.sims = res; run.disabled = false; run.textContent = 'Rerun the season'; paintOdds(); },
           function (p) { run.textContent = 'Simulating… ' + p + '%'; });
       };
       draw();
@@ -4577,6 +4577,8 @@
   }
   function phi(z) { return 1 / (1 + Math.exp(-1.702 * z)); }
   function runSims(D, N, done, progress) {
+    /* fixed seed: every run rolls the same dice, so a what-if shows only the effect of the picked results */
+    var rnd = (function (a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })(20261107);
     var M = D.models['22'], RT = M.rt, HFA = M.hfa, SIG = (D.bench && D.bench.sigma) || 15.5;
     var teams = Object.keys(D.teams), idx = {}; teams.forEach(function (t, i) { idx[t] = i; });
     var conf = teams.map(function (t) { return D.teams[t].conf; });
@@ -4631,7 +4633,7 @@
       for (var s = done_; s < end; s++) {
         W.set(baseW); L.set(baseL); CW.set(baseCW); CL.set(baseCL); RES.set(base); isChamp.fill(0);
         for (var r = 0; r < rem.length; r++) {
-          var gg = rem[r], hw = Math.random() < gg[2], wi = hw ? gg[0] : gg[1], li = hw ? gg[1] : gg[0];
+          var gg = rem[r], hw = rnd() < gg[2], wi = hw ? gg[0] : gg[1], li = hw ? gg[1] : gg[0];
           if (wi >= 0) { W[wi]++; if (gg[3]) CW[wi]++; RES[wi] += winVal(li); }
           if (li >= 0) { L[li]++; if (gg[3]) CL[li]++; RES[li] += lossVal(wi); }
         }
@@ -4641,13 +4643,13 @@
             if (pb !== pa) return pb - pa;
             var oa = W[a] / Math.max(1, W[a] + L[a]), ob = W[b] / Math.max(1, W[b] + L[b]);
             if (ob !== oa) return ob - oa;
-            return (rt[b] + Math.random() * 6) - (rt[a] + Math.random() * 6);
+            return (rt[b] + rnd() * 6) - (rt[a] + rnd() * 6);
           });
           var a1 = mem[0], b1 = mem[1]; out.ccg[a1]++; out.ccg[b1]++;
-          var win = Math.random() < phi((rt[a1] - rt[b1]) / SIG) ? a1 : b1, lose = win === a1 ? b1 : a1;
+          var win = rnd() < phi((rt[a1] - rt[b1]) / SIG) ? a1 : b1, lose = win === a1 ? b1 : a1;
           W[win]++; L[lose]++; RES[win] += winVal(lose); RES[lose] += lossVal(win); isChamp[win] = 1; out.champ[win]++;
         }
-        for (var i2 = 0; i2 < n; i2++) { score[i2] = RES[i2] + (isChamp[i2] ? 1.5 : 0) + (Math.random() - 0.5) * 3; out.winsSum[i2] += W[i2]; }
+        for (var i2 = 0; i2 < n; i2++) { score[i2] = RES[i2] + (isChamp[i2] ? 1.5 : 0) + (rnd() - 0.5) * 3; out.winsSum[i2] += W[i2]; }
         order.sort(function (a, b) { return score[b] - score[a]; });
         var field = [], inF = new Uint8Array(n);
         order.forEach(function (t) { if (isChamp[t] && P4[conf[t]]) { field.push(t); inF[t] = 1; } });
@@ -4701,6 +4703,7 @@
       'Each game is a coin weighted by the matchup board\'s Two-Deep model (talent plus results, ' + 'home field included); title-game spots go to the top two in conference winning percentage. ' +
       'The field follows the 2026 rules: the ACC, Big Ten, Big 12 and SEC champions, the highest-ranked team from the other six conferences, and seven more by ranking. ' +
       'The simulated ranking starts from the current CFP ranking and moves with each result: a win counts more against a strong opponent, a loss costs less against one (weights fitted to how the committee has ranked this season so far), plus a small bonus for a conference title. It approximates the committee; it cannot read its mind. Tiebreakers beyond winning percentage are not modeled. Re-runs every time the page loads.';
+    if (!oddsState.wiSorted) { oddsState.wiSorted = true; try { buildWhatIf(); } catch (e) {} }
     if (window.__tlRescan) window.__tlRescan();
   }
 
