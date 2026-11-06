@@ -225,9 +225,9 @@
      their tab is open. The address bar always holds the current view, so a link reopens it. */
   var TEAM_TABS = [
     { id: 'overview', label: 'Overview', nums: ['01', '21', '20', '02', '03', '07', '16'] },
-    { id: 'playcalling', label: 'Playcalling', nums: ['12', '13', '06'] },
+    { id: 'playcalling', label: 'Playcalling', nums: ['12', '13', '23', '24', '06'] },
     { id: 'field', label: 'On the field', nums: ['14', '05'] },
-    { id: 'units', label: 'Players & units', nums: ['15', '17', '08'] },
+    { id: 'units', label: 'Players & units', nums: ['15', '22', '17', '08'] },
     { id: 'matchups', label: 'Matchups', nums: ['19'] },
     { id: 'compare', label: 'Compare', nums: ['09', '18', '11', '10', '04'] }
   ];
@@ -266,7 +266,7 @@
   function muQueue() { if (muQueued) return; muQueued = true; setTimeout(function () { muQueued = false; muView(); }, 60); }
   window.addEventListener('scroll', muQueue, { passive: true });
   window.addEventListener('resize', muQueue);
-  var LAZY = { '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); } };
+  var LAZY = { '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); } };
   state.teamTab = state.teamTab || 'overview'; state.gSide = state.gSide || 0;
   state.liveKey = 0; state.liveDone = {};
 
@@ -304,6 +304,7 @@
   }
   function buildTeamTabs() {
     var host = document.getElementById('teamTabs'); if (!host) return;
+    try { p5Hero(); } catch (e) { /* the hero extras never block the tabs */ }
     var vn = document.getElementById('viewNav');
     var topNav = document.querySelector('header.nav');
     if (vn && topNav && innerWidth > 640) { vn.style.top = topNav.offsetHeight + 'px'; document.documentElement.style.setProperty('--navh', topNav.offsetHeight + vn.offsetHeight + 'px'); }
@@ -2727,6 +2728,532 @@
     }).catch(function (e) { chart.innerHTML = ''; chart.appendChild(h('p', 'ax', 'Could not load. ' + e.message)); });
   }
 
+
+  /* =====================================================================
+     Phase 5b: pressure map, situational playbook, fourth-down decisions,
+     scouting-page matchups, the "This week" page, following a team.
+     ===================================================================== */
+  function p5Cards(host, list) {
+    var cards = h('div', 'excards');
+    list.forEach(function (x) {
+      var c = h('div', 'excard'); c.appendChild(h('p', 'exl', x[0])); c.appendChild(h('p', 'exv', x[1])); if (x[2]) c.appendChild(h('p', 'exr', x[2]));
+      if (x[3] && x[4] > 1) c.style.boxShadow = 'inset 4px 0 0 ' + xRankBg(x[3], x[4]);
+      cards.appendChild(c);
+    });
+    host.appendChild(cards);
+  }
+  function p5Loading(host) { host.innerHTML = ''; host.appendChild(h('p', 'ax', 'Loading…')); }
+  function p5Fail(host, e) { host.innerHTML = ''; host.appendChild(h('p', 'ax', 'Could not load. ' + (e && e.message ? e.message : e))); }
+  function rk(n, pool) { return n ? '#' + n + (pool ? ' of ' + pool : '') : '–'; }
+
+  /* ---------------- pressure map (Players & units) ---------------- */
+  var SPOTS = {
+    A: ['A gap', 'Between the center and a guard', 352, 186], B: ['B gap', 'Between a guard and a tackle', 296, 186],
+    OT: ['Over the tackle', 'Head-up or shaded on a tackle', 240, 186], EDGE: ['Edge', 'Outside the tackle', 176, 186],
+    BOX: ['Box (off the ball)', 'Linebacker depth inside the box', 318, 112], SLOT: ['Slot', 'Over a slot receiver', 156, 112],
+    WIDE: ['Wide', 'Outside corner', 62, 140], DEEP: ['Deep', 'Safety depth', 380, 44]
+  };
+  function buildPressure() {
+    var host = document.getElementById('prsBody'); if (!host) return;
+    p5Loading(host);
+    var team = state.team, s = state.season, def = state.gSide === 1;
+    xGet('pressure', { team: team, season: s }).then(function (j) {
+      if (team !== state.team || s !== state.season) return;
+      host.innerHTML = '';
+      if (def) drawRush(host, j); else drawProtect(host, j);
+    }).catch(function (e) { p5Fail(host, e); });
+  }
+  function drawRush(host, j) {
+    var T = j.team, N = j.nat || {}, S = j.spots || {};
+    if (!T) { host.appendChild(h('p', 'ax', 'No PFF pass-rush data for ' + state.team + ' this season.')); return; }
+    p5Cards(host, [
+      ['Rushers per dropback', num(T.rushers, 2), 'FBS average ' + num(N.rushers, 2)],
+      ['Blitzers per dropback', num(T.blitzers, 2), rk(T.blitz_rk, T.pool) + ' most · FBS ' + num(N.blitzers, 2)],
+      ['Pressures per dropback', pct(T.prate, 0), rk(T.prate_rk, T.pool) + ' · FBS ' + pct(N.prate, 0), T.prate_rk, T.pool],
+      ['Pressure per rush snap', pct(T.win, 1), rk(T.win_rk, T.pool) + ' · FBS ' + pct(N.win, 1), T.win_rk, T.pool]
+    ]);
+    var W = 760, H = 330, d = isDarkTheme();
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'prssvg', role: 'img', 'aria-label': 'Where ' + state.team + '\'s pass rush comes from' });
+    var losY = 218, cx = 380;
+    svg.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, rx: 8, fill: d ? '#173d24' : '#3a8149' }));
+    svg.appendChild(el('line', { x1: 10, x2: W - 10, y1: losY, y2: losY, stroke: d ? '#7aa2ff' : '#cfe0ff', 'stroke-width': 3 }));
+    ['LT', 'LG', 'C', 'RG', 'RT'].forEach(function (lab, i) {
+      var x = cx + (i - 2) * 56;
+      svg.appendChild(el('rect', { x: x - 20, y: losY + 8, width: 40, height: 26, rx: 5, fill: 'rgba(255,255,255,.22)', stroke: 'rgba(255,255,255,.5)' }));
+      svg.appendChild(el('text', { x: x, y: losY + 26, 'text-anchor': 'middle', class: 'prsol' }, lab));
+    });
+    svg.appendChild(el('circle', { cx: cx, cy: losY + 74, r: 15, fill: 'rgba(255,255,255,.22)', stroke: 'rgba(255,255,255,.5)' }));
+    svg.appendChild(el('text', { x: cx, y: losY + 79, 'text-anchor': 'middle', class: 'prsol' }, 'QB'));
+    var maxR = 1; Object.keys(S).forEach(function (k) { maxR = Math.max(maxR, S[k].rush); });
+    var players = j.players || [];
+    Object.keys(SPOTS).forEach(function (k) {
+      var sp = SPOTS[k], v = S[k], x = sp[2], y = sp[3];
+      if (!v || !v.rush) {
+        svg.appendChild(el('circle', { cx: x, cy: y, r: 7, fill: 'none', stroke: 'rgba(255,255,255,.35)', 'stroke-dasharray': '3 3' }));
+        return;
+      }
+      var r = 9 + 28 * Math.sqrt(v.rush / maxR), rate = v.prs / v.rush;
+      var p = Math.max(0, Math.min(1, 0.5 + (rate - (N.win || 0.08)) / 0.16));
+      var c = el('circle', { cx: x, cy: y, r: r, fill: shade(p), 'fill-opacity': .92, stroke: '#fff', 'stroke-width': 1.5 });
+      svg.appendChild(c);
+      svg.appendChild(el('text', { x: x, y: y - r - 6, 'text-anchor': 'middle', class: 'prslab', stroke: d ? '#173d24' : '#3a8149', 'stroke-width': 4, 'paint-order': 'stroke' }, sp[0]));
+      svg.appendChild(el('text', { x: x, y: y + 4, 'text-anchor': 'middle', class: 'prsnum' }, v.prs));
+      var who = players.filter(function (pl) { return pl.spot === k; }).slice(0, 5)
+        .map(function (pl) { return pl.name + ' (' + pl.pos + '): ' + pl.prs + ' pressures, ' + pl.sk + ' sacks on ' + pl.rush + ' rushes'; }).join('<br>');
+      var hit = el('circle', { cx: x, cy: y, r: Math.max(r, 16), fill: 'transparent' });
+      bindTip(hit, '<b>' + sp[0] + '</b> · ' + sp[1] + '<br>' + v.rush + ' rush snaps · ' + v.prs + ' pressures · ' + v.sk + ' sacks<br>' +
+        pct(rate, 1) + ' pressure per rush (FBS ' + pct(N.win, 1) + ')' + (who ? '<br><br>' + who : ''));
+      svg.appendChild(hit);
+    });
+    svg.appendChild(el('text', { x: W - 16, y: 24, 'text-anchor': 'end', class: 'prslab' }, 'Number = pressures from that spot'));
+    svg.appendChild(el('text', { x: W - 16, y: 42, 'text-anchor': 'end', class: 'prssub' }, 'Size = rush snaps · color = pressure rate'));
+    svg.appendChild(el('text', { x: W - 16, y: 60, 'text-anchor': 'end', class: 'prssub' }, 'Both sides of the formation combined'));
+    var wrap = h('div', 'prswrap'); wrap.appendChild(svg); host.appendChild(wrap);
+    var X = tbl(['Rusher', 'Pos', 'Usually lines up', 'Rush snaps', 'Pressures', 'Sacks', 'Pressure rate', 'PFF rush grade']);
+    players.slice(0, 14).forEach(function (pl) {
+      var tr = h('tr'); tr.appendChild(td('pclab', pl.name)); tr.appendChild(td('nd', pl.pos)); tr.appendChild(td(null, (SPOTS[pl.spot] || [pl.spot])[0]));
+      tr.appendChild(td('nd', pl.rush)); tr.appendChild(td('nd', pl.prs)); tr.appendChild(td('nd', num(pl.sk, pl.sk % 1 ? 1 : 0)));
+      var rt = h('td', 'nd pcshade', pct(pl.prs / Math.max(1, pl.rush), 1));
+      rt.style.background = shade(Math.max(0, Math.min(1, 0.5 + (pl.prs / Math.max(1, pl.rush) - (N.win || 0.08)) / 0.16)));
+      tr.appendChild(rt); tr.appendChild(td('nd', pl.grade == null ? '–' : num(pl.grade, 1)));
+      X.tb.appendChild(tr);
+    });
+    host.appendChild(X.wrap);
+    host.appendChild(h('p', 'tblnote', 'From PFF\'s charting: every pass-rush snap and pressure (sack, hit or hurry), placed at the spot each player lines up most. Linebackers and defensive backs who rush are blitzers. Two players can share credit for one pressure, so pressure counts run high; the ranks compare like with like. Hover a spot to see who rushes from it.'));
+  }
+  function drawProtect(host, j) {
+    var O = j.ol, P = j.profile || {};
+    if (!O) { host.appendChild(h('p', 'ax', 'No PFF blocking grades for ' + state.team + ' this season.')); return; }
+    p5Cards(host, [
+      ['Offensive line, pass blocking', num(O.pbg, 1), 'PFF grade · ' + rk(O.pbg_rk, O.pool), O.pbg_rk, O.pool],
+      ['Offensive line, run blocking', num(O.rbg, 1), 'PFF grade · ' + rk(O.rbg_rk, O.pool), O.rbg_rk, O.pool],
+      ['Sacks per dropback', pct(P.sack_rate, 1), 'from the play-by-play']
+    ]);
+    var X = tbl(['Lineman', 'Pos', 'Pass-block snaps', 'Pass-block grade', 'Run-block snaps', 'Run-block grade']);
+    (j.blockers || []).forEach(function (b) {
+      var tr = h('tr'); tr.appendChild(td('pclab', b.name)); tr.appendChild(td('nd', b.pos)); tr.appendChild(td('nd', b.pb));
+      var g1 = h('td', 'nd pcshade', b.g == null ? '–' : num(b.g, 1)); if (b.g != null) g1.style.background = shade(Math.max(0, Math.min(1, (b.g - 45) / 40)));
+      tr.appendChild(g1); tr.appendChild(td('nd', b.rb));
+      var g2 = h('td', 'nd pcshade', b.rg == null ? '–' : num(b.rg, 1)); if (b.rg != null) g2.style.background = shade(Math.max(0, Math.min(1, (b.rg - 45) / 40)));
+      tr.appendChild(g2); X.tb.appendChild(tr);
+    });
+    host.appendChild(X.wrap);
+    host.appendChild(h('p', 'tblnote', 'PFF grades every block on a 0–100 scale (around 60 is an average starter, 80+ is excellent). Line grades are weighted by snaps. Switch to Defense in the bar above for where this team\'s own pass rush comes from.'));
+  }
+
+  /* ---------------- situational playbook (Playcalling) ---------------- */
+  var SITS = [['op', 'Opening script', 'first 15 plays of each game'], ['3s', '3rd and short', '1-3 to go'], ['3m', '3rd and medium', '4-6 to go'],
+    ['3l', '3rd and long', '7+ to go'], ['rz', 'Red zone', 'inside the 20'], ['gl', 'Goal to go', ''], ['2m', 'Two-minute drill', 'last 2:00 of a half'],
+    ['to', 'After a takeaway', 'first play after the defense gets the ball']];
+  function buildSitu() {
+    var host = document.getElementById('situBody'); if (!host) return;
+    p5Loading(host);
+    var team = state.team, s = state.season, side = state.gSide === 1 ? 'Defense' : 'Offense';
+    xGet('situ', { team: team, season: s, side: side }).then(function (j) {
+      if (team !== state.team || s !== state.season) return;
+      host.innerHTML = '';
+      var R = {}; (j.rows || []).forEach(function (r) { R[r.k] = r; });
+      var off = side === 'Offense';
+      var X = tbl(['Situation', 'Plays', off ? 'Pass rate' : 'Pass rate faced', 'Success' + (off ? '' : ' allowed'), 'EPA' + (off ? '' : ' allowed'), off ? 'Go-to players' : 'Tell']);
+      SITS.forEach(function (sd) {
+        var r = R[sd[0]]; if (!r) return;
+        var tr = h('tr');
+        var l = h('td', 'pclab'); l.appendChild(document.createTextNode(sd[1])); if (sd[2]) l.appendChild(h('span', 'sitsub', sd[2])); tr.appendChild(l);
+        tr.appendChild(td('nd', r.n));
+        var pr = h('td', 'sitbar'), diff = r.pass_rate - r.nat_pass;
+        var bar = h('span', 'sitb'); var fill = h('span', 'sitf'); fill.style.width = Math.round(r.pass_rate * 100) + '%'; bar.appendChild(fill);
+        var tick = h('span', 'sitt'); tick.style.left = Math.round(r.nat_pass * 100) + '%'; bar.appendChild(tick);
+        pr.appendChild(bar); pr.appendChild(h('span', 'sitv', pct(r.pass_rate) + (Math.abs(diff) >= 0.1 ? (diff > 0 ? ' ▲' : ' ▼') : '')));
+        pr.title = 'Pass rate ' + pct(r.pass_rate) + ' against an FBS average of ' + pct(r.nat_pass) + ' in this situation';
+        tr.appendChild(pr);
+        var c1 = h('td', 'nd pcshade'); c1.innerHTML = pct(r.sr, 0) + ' <span class="fdrk">#' + r.sr_rk + '</span>'; c1.style.background = xRankBg(r.sr_rk, r.pool); tr.appendChild(c1);
+        var c2 = h('td', 'nd pcshade'); c2.innerHTML = sgn(r.epa, 2) + ' <span class="fdrk">#' + r.epa_rk + '</span>'; c2.style.background = xRankBg(r.epa_rk, r.pool); tr.appendChild(c2);
+        var who = h('td', 'sitwho');
+        if (off) {
+          var bits = [];
+          (r.targets || []).slice(0, 2).forEach(function (x) { bits.push(x[0] + ' ' + x[1] + ' tgt'); });
+          (r.runners || []).slice(0, 2).forEach(function (x) { bits.push(x[0] + ' ' + x[1] + ' car'); });
+          who.textContent = bits.join(' · ') || '–';
+        } else {
+          who.textContent = Math.abs(diff) >= 0.1 ? 'Opponents ' + (diff > 0 ? 'throw' : 'run') + ' more than usual here' : '–';
+        }
+        if (off && r.pred_rk && r.pred_rk <= Math.round(r.pool * 0.15)) { var tg = h('span', 'sittag', 'predictable'); tg.title = 'Among the ' + Math.round(r.pool * 0.15) + ' FBS teams whose run/pass mix here strays furthest from the norm (#' + r.pred_rk + ')'; who.appendChild(tg); }
+        tr.appendChild(who);
+        X.tb.appendChild(tr);
+      });
+      host.appendChild(X.wrap);
+      host.appendChild(h('p', 'tblnote', (off ? 'What this offense does when the situation narrows the playbook. ' : 'What opponents do against this defense in the same spots, and how it holds up. ') +
+        'The bar is the pass rate (sacks count as passes); the tick is the FBS average in the same situation, and ▲/▼ marks a mix 10+ points off it. Success and EPA ranks are national (#1 = best' + (off ? '' : ' defense') + '). "Predictable" = among the most lopsided run/pass mixes in the country in that spot. Go-to players are the most frequent ball carriers (car) and targets (tgt) there.'));
+    }).catch(function (e) { p5Fail(host, e); });
+  }
+
+  /* ---------------- fourth-down decisions ---------------- */
+  function fieldPos(ytg) { return ytg > 50 ? 'own ' + (100 - ytg) : ytg === 50 ? 'midfield' : 'opp ' + ytg; }
+  var CALL = { go: 'Go for it', punt: 'Punt', fg: 'Field goal' };
+  state.fdAll = state.fdAll || 0;
+  function buildFourth() {
+    var host = document.getElementById('fourthBody'); if (!host) return;
+    p5Loading(host);
+    var team = state.team, s = state.season;
+    xGet('fourth', { team: team, season: s }).then(function (j) {
+      if (team !== state.team || s !== state.season) return;
+      host.innerHTML = '';
+      var S = j.summary;
+      if (!S) { host.appendChild(h('p', 'ax', 'No graded fourth downs for ' + team + ' in ' + s + '.')); return; }
+      p5Cards(host, [
+        ['Fourth-down decision rank', '#' + S.rank + ' of ' + S.pool, sgn(-S.lost_pg, 2) + ' expected points per game vs the model', S.rank, S.pool],
+        ['Agrees with the model', pct(S.agree, 0), S.n + ' fourth downs graded'],
+        ['Clear "go" spots taken', S.went + ' of ' + S.clear_go, S.timid + ' kicked when going was clearly better'],
+        ['Went for it', S.goes + ' times', S.conv + ' converted' + (S.bold ? ' · ' + S.bold + ' when kicking was clearly better' : '')]
+      ]);
+      var sg = h('div', 'segs'); host.appendChild(sg);
+      segs(sg, ['Calls that differed from the model', 'Every fourth down'], state.fdAll, function (i) { state.fdAll = i; buildFourth(); });
+      var X = tbl(['Wk', 'Opponent', 'Qtr', 'Score', 'Situation', 'Call', 'Model', 'Cost', 'Result']);
+      var list = (j.calls || []).filter(function (c) { return state.fdAll || (c.choice !== c.best && c.gap >= 0.1); });
+      list.forEach(function (c) {
+        var tr = h('tr', 'clickable');
+        tr.appendChild(td('nd', c.week)); tr.appendChild(td('pclab', c.opp)); tr.appendChild(td('nd', 'Q' + c.q + ' ' + Math.floor(c.clock / 60) + ':' + ('0' + c.clock % 60).slice(-2)));
+        tr.appendChild(td('nd', (c.sd > 0 ? 'Up ' : c.sd < 0 ? 'Down ' : 'Tied') + (c.sd ? Math.abs(c.sd) : '')));
+        tr.appendChild(td(null, '4th & ' + (c.dist >= c.ytg ? 'goal' : c.dist) + ', ' + fieldPos(c.ytg)));
+        tr.appendChild(td(null, CALL[c.choice]));
+        var m = h('td', 'pcshade', CALL[c.best] + (c.gap < 0.2 ? ' (close)' : ''));
+        tr.appendChild(m);
+        var cost = h('td', 'nd pcshade', c.lost > 0.005 ? '−' + num(c.lost, 2) : '0');
+        if (c.lost > 0.005) cost.style.background = shade(Math.max(0, 0.5 - c.lost / 2)); tr.appendChild(cost);
+        tr.appendChild(td(null, c.choice === 'go' ? (c.conv ? 'Converted' : 'Stopped') : ''));
+        tr.title = 'Expected points — go: ' + sgn(c.go, 2) + ' (' + pct(c.pc, 0) + ' to convert) · punt: ' + sgn(c.punt, 2) + (c.fg != null ? ' · field goal: ' + sgn(c.fg, 2) + ' (' + pct(c.pf, 0) + ' make)' : '') + '\n' + (c.text || '');
+        tr.onclick = function () { vstate.boxGame = c.game; setView('box'); };
+        X.tb.appendChild(tr);
+      });
+      if (!list.length) host.appendChild(h('p', 'ax', 'Every fourth-down call matched the model.'));
+      else host.appendChild(X.wrap);
+      host.appendChild(h('p', 'tblnote', 'Each fourth down is valued three ways in expected points: go (conversion odds by distance from every college 3rd and 4th down), punt (net about 40 yards) and field goal (make rate by kick length), using the standard college expected-points curve for field position. Cost = points given up against the best option. End-of-half and blowout situations are left out, since the clock decides those. Hover a row for the numbers behind it; tap it for the box score.'));
+    }).catch(function (e) { p5Fail(host, e); });
+  }
+  function buildFourthLeague() {
+    var host = document.getElementById('fourthLeague'); if (!host) return;
+    p5Loading(host);
+    xGet('fourth_league', { season: state.season }).then(function (j) {
+      host.innerHTML = '';
+      var X = tbl(['Rk', 'School', 'Head coach', '4th downs', 'Agree', 'Clear go spots taken', 'Kicked, should go', 'Went, should kick', 'Pts lost / game']);
+      (j.rows || []).forEach(function (r) {
+        var tr = h('tr'); if (r.team === state.team) tr.className = 'me';
+        tr.appendChild(td('nd', r.rank));
+        var t = h('td', 'tm'); var b = h('button', null, r.team); b.onclick = function () { pickTeam(r.team); }; t.appendChild(b); tr.appendChild(t);
+        tr.appendChild(td(null, r.coach || '–')); tr.appendChild(td('nd', r.n)); tr.appendChild(td('nd', pct(r.agree, 0)));
+        tr.appendChild(td('nd', r.went + ' of ' + r.clear_go)); tr.appendChild(td('nd', r.timid)); tr.appendChild(td('nd', r.bold));
+        var c = h('td', 'nd pcshade', num(r.lost_pg, 2)); c.style.background = xRankBg(r.rank, r.pool); tr.appendChild(c);
+        X.tb.appendChild(tr);
+      });
+      X.wrap.classList.add('tall'); host.appendChild(X.wrap);
+      host.appendChild(h('p', 'tblnote', 'Every FBS team\'s ' + state.season + ' fourth downs graded against an expected-points model (go, punt or kick). Ranked by expected points given up per game. A "clear go spot" is one where going for it was worth half a point or more over the next best option.'));
+    }).catch(function (e) { p5Fail(host, e); });
+  }
+
+  /* ---------------- the Post-Snap number (matchup board model) ---------------- */
+  function psModel(D, home, away, neutral) {
+    var m = D && D.models && D.models['22']; if (!m) return null;
+    var H = SC_BOARD_NAME[home] || home, A = SC_BOARD_NAME[away] || away;
+    if (m.rt[H] == null || m.rt[A] == null || m.tal[H] == null || m.tal[A] == null) return null;
+    var margin = m.rt[H] - m.rt[A] + D.beta * (m.tal[H] - m.tal[A]) + (neutral ? 0 : m.hfa);
+    return { margin: margin, pHome: phi(margin / ((D.bench && D.bench.sigma) || 15.5)) };
+  }
+  function pickTxt(home, away, mm) { var fav = mm.margin >= 0 ? home : away; return fav + ' by ' + num(Math.abs(mm.margin), 1) + ' (' + pct(mm.margin >= 0 ? mm.pHome : 1 - mm.pHome, 0) + ')'; }
+  function lineTxt(home, away, spread) {
+    if (spread == null) return 'no line yet';
+    if (Math.abs(spread) < 0.01) return 'pick\'em';
+    return (spread < 0 ? home : away) + ' −' + num(Math.abs(spread), 1);
+  }
+  /* open a game's preview from team names and a week */
+  function openPreview(week, home, away) {
+    scGet('api/games?season=' + state.season + '&week=' + week).then(function (j) {
+      var hit = (j.games || []).filter(function (g) { return (g.home_team === home && g.away_team === away) || (g.home_team === away && g.away_team === home); })[0];
+      if (!hit) return;
+      ['home_sp','away_sp','projected_margin','market_margin','spread','over_under','home_points','away_points'].forEach(function (k) { hit[k] = hit[k] == null ? null : +hit[k]; });
+      sc.game = hit; sc.game.week = week; vstate.scoutGame = hit.game_id; vstate.week = week; setView('scout');
+    });
+  }
+
+  /* ---------------- scouting page additions ---------------- */
+  function scExtra(root, A, B, s, g) {
+    scGet('api/matchups-data').then(function (D) {
+      var mm = psModel(D, B, A, g.neutral_site); if (!mm) return;
+      var tiles = document.getElementById('scoutTiles'); if (!tiles) return;
+      var d = h('div', 'tile pstile'); d.appendChild(h('span', 'k', 'Post-Snap model')); d.appendChild(h('span', 'v', pickTxt(B, A, mm)));
+      d.title = 'The matchup board\'s model: this season\'s results rating plus Two-Deep recruiting talent and home field. Win chance in parentheses.';
+      tiles.insertBefore(d, tiles.firstChild);
+    }).catch(function () {});
+    var p6 = scPanel(root, '06', 'Key matchups', 'Who gets the ball and where, against how the other side defends those spots; the run lanes; and the offensive line against the pass rush.');
+    var p7 = scPanel(root, '07', 'Situations', 'Third downs, the red zone, the two-minute drill and the first series after a turnover: the offense\'s habits against what the defense allows.');
+    var p8 = scPanel(root, '08', 'Fourth downs', 'How each coaching staff handles fourth down, graded against an expected-points model.');
+    var side = function (team, sd) { return 'team=' + encodeURIComponent(team) + '&season=' + s + '&side=' + sd; };
+    var dir = 0;
+    function draw() {
+      var off = dir === 0 ? A : B, def = dir === 0 ? B : A;
+      [p6, p7].forEach(function (p) { p.ctl.parentNode.hidden = false; segs(p.ctl, [A + ' offense vs ' + B + ' defense', B + ' offense vs ' + A + ' defense'], dir, function (i) { dir = i; draw(); }); });
+      p5Loading(p6.body); p5Loading(p7.body);
+      Promise.all([scGet('api/field?' + side(off, 'Offense')), scGet('api/field?' + side(def, 'Defense')),
+        xGet('pressure', { team: off, season: s }), xGet('pressure', { team: def, season: s })]).then(function (r) {
+        scKeyMatchups(p6.body, off, def, r[0], r[1], r[2], r[3]);
+      }).catch(function (e) { p5Fail(p6.body, e); });
+      Promise.all([xGet('situ', { team: off, season: s, side: 'Offense' }), xGet('situ', { team: def, season: s, side: 'Defense' })]).then(function (r) {
+        scSitu(p7.body, off, def, r[0], r[1]);
+      }).catch(function (e) { p5Fail(p7.body, e); });
+    }
+    draw();
+    p5Loading(p8.body);
+    Promise.all([xGet('fourth', { team: A, season: s }), xGet('fourth', { team: B, season: s })]).then(function (r) {
+      p8.body.innerHTML = '';
+      var X = tbl(['', A, B]);
+      var a = r[0].summary || {}, b = r[1].summary || {};
+      [['Decision rank', function (x) { return x.rank ? '#' + x.rank + ' of ' + x.pool : '–'; }],
+       ['Agrees with the model', function (x) { return x.agree != null ? pct(x.agree, 0) : '–'; }],
+       ['Clear "go" spots taken', function (x) { return x.clear_go != null ? x.went + ' of ' + x.clear_go : '–'; }],
+       ['Went for it / converted', function (x) { return x.goes != null ? x.goes + ' / ' + x.conv : '–'; }],
+       ['Expected points lost per game', function (x) { return x.lost_pg != null ? num(x.lost_pg, 2) : '–'; }]].forEach(function (row, i) {
+        var tr = h('tr'); tr.appendChild(td('pclab', row[0]));
+        [a, b].forEach(function (x) { var c = td('nd', row[1](x)); if (i === 0 && x.rank) { c.className = 'nd pcshade'; c.style.background = xRankBg(x.rank, x.pool); } tr.appendChild(c); });
+        X.tb.appendChild(tr);
+      });
+      p8.body.appendChild(X.wrap);
+      p8.body.appendChild(h('p', 'tblnote', 'The full call-by-call list is on each team\'s Playcalling tab.'));
+    }).catch(function (e) { p5Fail(p8.body, e); });
+  }
+  function scKeyMatchups(host, off, def, F, G, PO, PD) {
+    host.innerHTML = '';
+    var Z = G.zones || {}, OZ = F.zones || {};
+    host.appendChild(h('h3', 'fdh', off + '\'s receivers against ' + def + '\'s pass defense'));
+    var by = {};
+    (F.passes || []).forEach(function (p) {
+      var who = p[7]; if (!who || !p[17]) return;
+      var b = by[who] = by[who] || { n: 0, c: 0, y: 0, epa: 0, z: {} }; b.n++; if (p[2] === 'C') { b.c++; b.y += p[4] || 0; } b.epa += +p[5] || 0;
+      b.z[p[17]] = (b.z[p[17]] || 0) + 1;
+    });
+    var top = Object.keys(by).sort(function (x, y) { return by[y].n - by[x].n; }).slice(0, 6);
+    if (top.length) {
+      var X = tbl(['Target', 'Targets', 'Catches · yards', 'EPA / target', 'Favorite spot', def + ' allows there']);
+      top.forEach(function (n) {
+        var b = by[n], zk = Object.keys(b.z).sort(function (x, y) { return b.z[y] - b.z[x]; })[0], dz = Z[zk];
+        var tr = h('tr'); tr.appendChild(td('pclab', n)); tr.appendChild(td('nd', b.n)); tr.appendChild(td('nd', b.c + ' · ' + b.y));
+        tr.appendChild(td('nd', sgn(b.epa / b.n, 2)));
+        tr.appendChild(td(null, FZ[zk[0]][2].replace(/ \(.*/, '') + ' ' + FL[zk[1]].toLowerCase() + ' (' + pct(b.z[zk] / b.n, 0) + ')'));
+        var c = h('td', 'pcshade');
+        if (dz) {
+          c.innerHTML = sgn(dz.epa, 2) + ' EPA <span class="fdrk">#' + dz.rk_epa + '</span>' + (dz.rk_epa > dz.pool * 0.66 ? ' <span class="sittag good">soft spot</span>' : dz.rk_epa <= dz.pool * 0.2 ? ' <span class="sittag bad">strength</span>' : '');
+          c.style.background = shade(1 - (dz.pool - dz.rk_epa) / Math.max(1, dz.pool - 1));
+        } else c.textContent = '–';
+        tr.appendChild(c); X.tb.appendChild(tr);
+      });
+      host.appendChild(X.wrap);
+    } else host.appendChild(h('p', 'ax', 'No charted targets for ' + off + '.'));
+    host.appendChild(h('h3', 'fdh', 'Run lanes'));
+    var R = tbl(['Lane', off + ' runs there', 'Yards per carry', 'EPA / run', def + ' allows there']);
+    ['RL', 'RM', 'RR'].forEach(function (k) {
+      var o = OZ[k], dz = Z[k]; if (!o) return;
+      var tr = h('tr'); tr.appendChild(td('pclab', FL[k[1]])); tr.appendChild(td('nd', pct(o.share, 0) + ' (' + o.n + ')'));
+      tr.appendChild(td('nd', num(o.ypp, 1))); tr.appendChild(td('nd', sgn(o.epa, 2)));
+      var c = h('td', 'pcshade');
+      if (dz) { c.innerHTML = num(dz.ypp, 1) + ' YPC, ' + sgn(dz.epa, 2) + ' EPA <span class="fdrk">#' + dz.rk_epa + '</span>'; c.style.background = shade(1 - (dz.pool - dz.rk_epa) / Math.max(1, dz.pool - 1)); } else c.textContent = '–';
+      tr.appendChild(c); R.tb.appendChild(tr);
+    });
+    host.appendChild(R.wrap);
+    host.appendChild(h('h3', 'fdh', off + '\'s protection against ' + def + '\'s pass rush'));
+    var ol = PO.ol || {}, pr = PD.team || {};
+    var P = tbl(['', off + ' offense', def + ' defense']);
+    [['Pass blocking / pass rush (PFF)', ol.pbg != null ? num(ol.pbg, 1) + ' grade, ' + rk(ol.pbg_rk, ol.pool) : '–', pr.prate != null ? pct(pr.prate, 0) + ' pressure per dropback, ' + rk(pr.prate_rk, pr.pool) : '–'],
+     ['Sacks', PO.profile && PO.profile.sack_rate != null ? pct(PO.profile.sack_rate, 1) + ' of dropbacks' : '–', pr.sk != null ? num(pr.sk, 0) + ' sacks' : '–'],
+     ['Blitzing', '', pr.blitzers != null ? num(pr.blitzers, 2) + ' blitzers per dropback, ' + rk(pr.blitz_rk, pr.pool) + ' most' : '–']].forEach(function (row) {
+      var tr = h('tr'); row.forEach(function (v, i) { tr.appendChild(td(i ? 'nd' : 'pclab', v)); }); P.tb.appendChild(tr);
+    });
+    host.appendChild(P.wrap);
+    host.appendChild(h('p', 'tblnote', 'Zone and lane numbers are season to date. "' + def + ' allows there" ranks the defense nationally in that spot (#1 = toughest); soft spot = bottom third, strength = top fifth. Protection and pass rush come from PFF charting.'));
+  }
+  function scSitu(host, off, def, O, Dd) {
+    host.innerHTML = '';
+    var RO = {}, RD = {}; (O.rows || []).forEach(function (r) { RO[r.k] = r; }); (Dd.rows || []).forEach(function (r) { RD[r.k] = r; });
+    var X = tbl(['Situation', off + ' pass rate', off + ' success', def + ' success allowed', 'Edge', off + ' go-to']);
+    SITS.forEach(function (sd) {
+      var o = RO[sd[0]], d = RD[sd[0]]; if (!o && !d) return;
+      var tr = h('tr'); tr.appendChild(td('pclab', sd[1]));
+      tr.appendChild(td('nd', o ? pct(o.pass_rate, 0) + ' (FBS ' + pct(o.nat_pass, 0) + ')' : '–'));
+      var a = h('td', 'nd pcshade', o ? pct(o.sr, 0) + ' #' + o.sr_rk : '–'); if (o) a.style.background = xRankBg(o.sr_rk, o.pool); tr.appendChild(a);
+      var b = h('td', 'nd pcshade', d ? pct(d.sr, 0) + ' #' + d.sr_rk : '–'); if (d) b.style.background = xRankBg(d.sr_rk, d.pool); tr.appendChild(b);
+      var e = '–'; if (o && d) { var gap = (d.sr_rk / d.pool) - (o.sr_rk / o.pool); e = Math.abs(gap) < 0.12 ? 'even' : gap > 0 ? off : def; }
+      tr.appendChild(td(null, e));
+      var bits = []; if (o) { (o.targets || []).slice(0, 1).forEach(function (x) { bits.push(x[0]); }); (o.runners || []).slice(0, 1).forEach(function (x) { bits.push(x[0]); }); }
+      tr.appendChild(td(null, bits.join(', ') || '–'));
+      X.tb.appendChild(tr);
+    });
+    host.appendChild(X.wrap);
+    host.appendChild(h('p', 'tblnote', 'Success rates ranked nationally from each unit\'s point of view (#1 = best offense, or best defense). Edge goes to whichever unit ranks clearly higher.'));
+  }
+
+  /* ---------------- following a team ---------------- */
+  function followTeam() { try { return localStorage.getItem('ps.follow') || ''; } catch (e) { return ''; } }
+  function setFollow(t) { try { if (t) localStorage.setItem('ps.follow', t); else localStorage.removeItem('ps.follow'); } catch (e) {} }
+  var heroKey = '';
+  function p5Hero() {
+    var h1 = document.getElementById('heroTeam'); if (!h1 || !state.team) return;
+    var btn = document.getElementById('followBtn');
+    if (!btn) { btn = h('button', 'followbtn'); btn.id = 'followBtn'; btn.type = 'button'; h1.parentNode.insertBefore(btn, h1.nextSibling); }
+    var on = followTeam() === state.team;
+    btn.textContent = on ? '★ Following' : '☆ Follow ' + state.team;
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.title = on ? 'The site opens to ' + state.team + '. Tap to stop following.' : 'Open the site to ' + state.team + ' every time, with its next game on the This week page';
+    btn.onclick = function () { setFollow(followTeam() === state.team ? '' : state.team); heroKey = ''; p5Hero(); };
+    var key = state.team + '|' + state.season; if (heroKey === key) return; heroKey = key;
+    var strip = document.getElementById('heroNext');
+    if (!strip) { strip = h('div', 'heronext'); strip.id = 'heroNext'; var tiles = document.getElementById('tiles'); tiles.parentNode.insertBefore(strip, tiles.nextSibling); }
+    strip.innerHTML = '';
+    scGet('api/matchups-data').then(function (D) {
+      if (key !== state.team + '|' + state.season) return;
+      var g = nextGame(D, state.team); if (!g) { strip.hidden = true; return; }
+      strip.hidden = false;
+      var home = siteName(g[2]), away = siteName(g[3]), me = state.team, opp = home === me ? away : home;
+      var mm = psModel(D, home, away, !!g[4]);
+      strip.appendChild(h('span', 'hnk', 'Next'));
+      strip.appendChild(h('span', 'hnv', new Date(g[1] + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + ' · ' + (g[4] ? 'vs ' : home === me ? 'vs ' : 'at ') + opp));
+      if (mm) strip.appendChild(h('span', 'hnv', 'Post-Snap: ' + pickTxt(home, away, mm)));
+      strip.appendChild(h('span', 'hnv', 'Line: ' + lineTxt(home, away, g[5])));
+      var b = h('button', 'navlink', 'Preview →'); b.type = 'button'; b.onclick = function () { openPreview(g[0], home, away); }; strip.appendChild(b);
+    }).catch(function () { strip.hidden = true; });
+  }
+  function nextGame(D, team) {
+    var b = SC_BOARD_NAME[team] || team;
+    return (D.schedule || []).filter(function (g) { return g[2] === b || g[3] === b; }).sort(function (x, y) { return x[1] < y[1] ? -1 : 1; })[0] || null;
+  }
+
+  /* ---------------- This week ---------------- */
+  function buildWeek() {
+    var root = document.getElementById('weekBody'); if (!root) return;
+    root.innerHTML = '';
+    var mine = h('section', 'panel'), games = h('section', 'panel'), dig = h('section', 'panel'), card = h('section', 'panel');
+    [mine, games, dig, card].forEach(function (p) { root.appendChild(p); });
+    function head(p, n, t, sub) { var hd = h('div', 'phead'); hd.appendChild(h('p', 'num', n)); var d = h('div'); d.appendChild(h('h2', null, t)); if (sub) d.appendChild(h('p', null, sub)); hd.appendChild(d); p.appendChild(hd); var b = h('div'); p.appendChild(b); return b; }
+    var mineB = head(mine, '01', 'Your team', null), gamesB = head(games, '02', 'Games to watch', 'The best matchups left this week by the Post-Snap model: both teams good, and close. Tap one for its full preview.'),
+      digB = head(dig, '03', 'What changed last week', 'Upsets, the biggest misses by the betting line, the best performances adjusted for the opponent, and how the AP poll moved.'),
+      cardB = head(card, '04', 'Model report card', 'How the Post-Snap model has done this season, predicting each week only from games played before it, against the betting line.');
+    [mineB, gamesB, digB, cardB].forEach(p5Loading);
+    scGet('api/matchups-data').then(function (D) {
+      var wk = Math.min.apply(null, (D.schedule || []).map(function (g) { return g[0]; }).concat([99]));
+      document.getElementById('weekEyebrow').textContent = state.season + ' season · week ' + (wk === 99 ? '–' : wk);
+      /* your team */
+      mineB.innerHTML = '';
+      var f = followTeam();
+      if (!f) {
+        mineB.appendChild(h('p', 'ax', 'Follow a team with the ☆ Follow button on its page and its next game shows up here, and the site opens to it.'));
+      } else {
+        var g = nextGame(D, f);
+        if (!g) mineB.appendChild(h('p', 'ax', f + ' has no game left on the schedule.'));
+        else {
+          var home = siteName(g[2]), away = siteName(g[3]), mm = psModel(D, home, away, !!g[4]);
+          mineB.appendChild(weekCard(D, g, home, away, mm, true));
+        }
+      }
+      /* games to watch */
+      gamesB.innerHTML = '';
+      var m = D.models['22'];
+      var list = (D.schedule || []).filter(function (g) { return g[0] === wk; }).map(function (g) {
+        var home = siteName(g[2]), away = siteName(g[3]), mm = psModel(D, home, away, !!g[4]);
+        var q = mm ? (m.rt[g[2]] + m.rt[g[3]]) / 2 - 0.45 * Math.abs(mm.margin) : -99;
+        return { g: g, home: home, away: away, mm: mm, q: q };
+      }).sort(function (a, b) { return b.q - a.q; });
+      var watch = h('div', 'wkgrid');
+      list.slice(0, 10).forEach(function (x) { watch.appendChild(weekCard(D, x.g, x.home, x.away, x.mm, false)); });
+      gamesB.appendChild(watch);
+      var all = h('button', 'navlink', 'Full slate with every line →'); all.type = 'button'; all.onclick = function () { vstate.week = wk; vstate.games = null; setView('games'); };
+      gamesB.appendChild(all);
+      /* report card */
+      drawReport(cardB, D);
+    }).catch(function (e) { p5Fail(mineB, e); p5Fail(gamesB, e); p5Fail(cardB, e); });
+    xGet('digest', { season: state.season }).then(function (j) { drawDigest(digB, j); }).catch(function (e) { p5Fail(digB, e); });
+  }
+  function weekCard(D, g, home, away, mm, big) {
+    var c = h('div', 'wkcard' + (big ? ' big' : ''));
+    var top = h('p', 'wkwhen', new Date(g[1] + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + (g[4] ? ' · neutral site' : ''));
+    c.appendChild(top);
+    var t = h('p', 'wkteams'); t.appendChild(h('span', null, away)); t.appendChild(h('span', 'scat', g[4] ? ' vs ' : ' at ')); t.appendChild(h('span', null, home)); c.appendChild(t);
+    var row = h('div', 'wkrow');
+    if (mm) {
+      var pk = h('div', 'wkpick'); pk.appendChild(h('span', 'k', 'Post-Snap')); pk.appendChild(h('span', 'v', pickTxt(home, away, mm))); row.appendChild(pk);
+    }
+    var ln = h('div', 'wkpick'); ln.appendChild(h('span', 'k', 'Line')); ln.appendChild(h('span', 'v', lineTxt(home, away, g[5]))); row.appendChild(ln);
+    if (mm && g[5] != null) {
+      var edge = mm.margin - (-g[5]);
+      var ed = h('div', 'wkpick'); ed.appendChild(h('span', 'k', 'Model vs line')); ed.appendChild(h('span', 'v', Math.abs(edge) < 1 ? 'agree' : (edge > 0 ? home : away) + ' +' + num(Math.abs(edge), 1))); row.appendChild(ed);
+    }
+    c.appendChild(row);
+    var b = h('button', 'navlink', 'Preview →'); b.type = 'button'; b.onclick = function () { openPreview(g[0], home, away); }; c.appendChild(b);
+    return c;
+  }
+  var lastPost = '';
+  function drawDigest(host, j) {
+    host.innerHTML = '';
+    var post = ['Week ' + j.week + ' in college football, by the numbers (thepostsnap.com):'];
+    var grid = h('div', 'dggrid');
+    function box(title, rows) { var b = h('div', 'dgbox'); b.appendChild(h('h3', 'fdh', title)); var ul = h('ul', 'dglist'); rows.forEach(function (r) { var li = h('li'); li.innerHTML = r; ul.appendChild(li); }); b.appendChild(ul); grid.appendChild(b); }
+    var ups = (j.upsets || []).slice(0, 5);
+    box('Upsets', ups.length ? ups.map(function (u) { return '<b>' + u.winner + '</b> over ' + u.loser + ' ' + u.score + ' <span class="dgsub">as a ' + num(u.line, 1) + '-point underdog</span>'; }) : ['No favorite lost.']);
+    if (ups[0]) post.push('Biggest upset: ' + ups[0].winner + ' over ' + ups[0].loser + ' as a ' + num(ups[0].line, 1) + '-point underdog.');
+    box('Beat the line by the most', (j.covers || []).map(function (c) { return '<b>' + c.team + '</b> by ' + num(c.by, 1) + ' <span class="dgsub">' + c.score + '</span>'; }));
+    box('Best offense, adjusted for the opponent', (j.best_off || []).map(function (o) { return '<b>' + o.team + '</b> ' + sgn(o.adj, 2) + ' EPA/play <span class="dgsub">vs ' + o.opp + '</span>'; }));
+    if (j.best_off && j.best_off[0]) post.push('Best offense: ' + j.best_off[0].team + ' (' + sgn(j.best_off[0].adj, 2) + ' EPA/play adjusted vs ' + j.best_off[0].opp + ').');
+    box('Best defense, adjusted for the opponent', (j.best_def || []).map(function (o) { return '<b>' + o.team + '</b> ' + sgn(o.adj, 2) + ' EPA/play allowed <span class="dgsub">vs ' + o.opp + '</span>'; }));
+    if (j.best_def && j.best_def[0]) post.push('Best defense: ' + j.best_def[0].team + ' (' + sgn(j.best_def[0].adj, 2) + ' EPA/play allowed, adjusted, vs ' + j.best_def[0].opp + ').');
+    var moves = (j.poll || []).map(function (p) { return { t: p.team, r: p.rank, d: p.prev ? p.prev - p.rank : null }; });
+    var up = moves.filter(function (m) { return m.d === null || m.d >= 3; }).sort(function (a, b) { return (b.d === null ? 99 : b.d) - (a.d === null ? 99 : a.d); }).slice(0, 5);
+    var dn = moves.filter(function (m) { return m.d !== null && m.d <= -3; }).sort(function (a, b) { return a.d - b.d; }).slice(0, 4);
+    var pr = up.map(function (m) { return '<b>' + m.t + '</b> ' + (m.d === null ? 'enters at #' + m.r : 'up ' + m.d + ' to #' + m.r); })
+      .concat(dn.map(function (m) { return '<b>' + m.t + '</b> down ' + (-m.d) + ' to #' + m.r; }))
+      .concat((j.dropped || []).map(function (d) { return '<b>' + d.team + '</b> falls out from #' + d.prev; }));
+    box('AP poll movers', pr.length ? pr : ['Little movement this week.']);
+    var el2 = (j.elo || []).slice(0, 6).map(function (e) { return '<b>' + e.team + '</b> ' + (e.swing > 0 ? '+' : '') + Math.round(e.swing) + ' <span class="dgsub">Elo ' + Math.round(e.elo) + '</span>'; });
+    box('Biggest rating swings (Elo)', el2);
+    host.appendChild(grid);
+    post.push('Full breakdown: thepostsnap.com');
+    lastPost = post.join('\n');
+    var cp = h('button', 'pcreset', 'Copy as a post'); cp.type = 'button';
+    var pre = h('textarea', 'dgpost'); pre.value = lastPost; pre.readOnly = true; pre.rows = 6;
+    cp.onclick = function () {
+      var done = function () { cp.textContent = 'Copied'; setTimeout(function () { cp.textContent = 'Copy as a post'; }, 1600); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(lastPost).then(done, function () { pre.select(); });
+      else { pre.select(); }
+    };
+    var pw = h('div', 'dgpostwrap'); pw.appendChild(pre); pw.appendChild(cp); host.appendChild(pw);
+    host.appendChild(h('p', 'tblnote', 'Week ' + j.week + ' results; AP poll week ' + j.poll_week + '. Adjusted performances use the same opponent adjustment as the team pages (min. 40 plays).'));
+  }
+  function drawReport(host, D) {
+    host.innerHTML = '';
+    var R = D.report || [];
+    if (!R.length) { host.appendChild(h('p', 'ax', 'The report card appears after the next weekly update.')); return; }
+    var wk = {}, tot = { n: 0, mh: 0, kh: 0, kn: 0, aw: 0, al: 0, me: 0, ke: 0 };
+    R.forEach(function (r) {
+      var w = wk[r[0]] = wk[r[0]] || { n: 0, mh: 0, kh: 0, kn: 0, aw: 0, al: 0 };
+      [w, tot].forEach(function (x) {
+        x.n++; if ((r[4] > 0) === (r[6] > 0)) x.mh++;
+        if (r[5] != null) { x.kn++; if ((r[5] > 0) === (r[6] > 0)) x.kh++; if (Math.abs(r[4] - r[5]) >= 0.5 && r[6] !== r[5]) { if (((r[4] - r[5]) > 0) === ((r[6] - r[5]) > 0)) x.aw++; else x.al++; } }
+      });
+      tot.me += Math.abs(r[6] - r[4]); if (r[5] != null) tot.ke += Math.abs(r[6] - r[5]);
+    });
+    p5Cards(host, [
+      ['Picked the winner', pct(tot.mh / tot.n, 0), tot.mh + ' of ' + tot.n + ' games'],
+      ['Betting line picked the winner', pct(tot.kh / Math.max(1, tot.kn), 0), tot.kh + ' of ' + tot.kn + ' games'],
+      ['Against the spread', tot.aw + '-' + tot.al, pct(tot.aw / Math.max(1, tot.aw + tot.al), 0) + ' when the model disagreed with the line'],
+      ['Typical miss', num(tot.me / tot.n, 1) + ' pts', 'line: ' + num(tot.ke / Math.max(1, tot.kn), 1) + ' pts']
+    ]);
+    var X = tbl(['Week', 'Games', 'Model winners', 'Line winners', 'Model vs spread']);
+    Object.keys(wk).map(Number).sort(function (a, b) { return b - a; }).forEach(function (w) {
+      var x = wk[w], tr = h('tr');
+      tr.appendChild(td('nd', w)); tr.appendChild(td('nd', x.n));
+      var a = h('td', 'nd pcshade', pct(x.mh / x.n, 0)); a.style.background = shade(Math.max(0, Math.min(1, (x.mh / x.n - 0.5) / 0.4))); tr.appendChild(a);
+      tr.appendChild(td('nd', x.kn ? pct(x.kh / x.kn, 0) : '–'));
+      tr.appendChild(td('nd', x.aw + '-' + x.al));
+      X.tb.appendChild(tr);
+    });
+    host.appendChild(X.wrap);
+    host.appendChild(h('p', 'tblnote', 'Honest test: each week is predicted from a rating fit only on the games before it (week 3 on, FBS vs FBS). "Against the spread" counts games where the model and the closing line differed by at least half a point, and whether the final margin landed on the model\'s side. The betting market is a tough benchmark and usually wins; this is a record, not a recommendation.'));
+  }
+
   /* =====================================================================
      Views. The team page is one thing; a weekly slate and league-wide
      tables are another shape entirely, so they get their own screens
@@ -2734,6 +3261,7 @@
      ===================================================================== */
   var VIEWS = [
     { id: 'team',    label: 'Team',    el: 'viewTeam' },
+    { id: 'week',    label: 'This week', el: 'viewWeek' },
     { id: 'games',   label: 'Games',   el: 'viewGames' },
     { id: 'league',  label: 'League',  el: 'viewLeague' },
     { id: 'odds',    label: 'Playoff odds', el: 'viewOdds' },
@@ -2773,7 +3301,8 @@
 
     if (id === 'games') buildGames();
     if (id === 'league') buildLeague();
-    if (id === 'coaches') buildCoaches();
+    if (id === 'coaches') { buildCoaches(); buildFourthLeague(); }
+    if (id === 'week') buildWeek();
     if (id === 'odds') buildOdds();
     if (id === 'glossary') buildGlossary();
     if (id === 'box') buildBox();
@@ -3061,6 +3590,7 @@
     }
     directional();
 
+    scExtra(root, A, B, s, g);
     scGet('api/matchups-data').then(function (D) { scTalent(p5.body, A, B, D); })
       .catch(function (e) { p5.body.innerHTML = ''; p5.body.appendChild(h('p', 'ax', 'Could not load the matchup board data. ' + e.message)); });
     if (window.__tlRescan) window.__tlRescan();
@@ -4236,7 +4766,9 @@
       });
       var inp = document.getElementById('teamInput');
       var qs = new URLSearchParams(location.search).get('team');
+      var fw = followTeam();
       var start = qs && list.some(function (t) { return t.team === qs; }) ? qs
+        : fw && list.some(function (t) { return t.team === fw; }) ? fw
         : (list.some(function (t) { return t.team === 'Auburn'; }) ? 'Auburn' : list[0].team);
       inp.value = start;
       inp.addEventListener('change', function () {

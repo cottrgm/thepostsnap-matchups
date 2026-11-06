@@ -1,0 +1,48 @@
+
+/* ---------- phase 5b ---------- */
+.prswrap{max-width:780px}
+.prssvg{display:block;width:100%;height:auto;margin:6px 0 12px}
+.prssvg text{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif}
+.prssvg .prsol{fill:#fff!important;font-size:12px;font-weight:600}
+.prssvg .prslab{fill:#fff!important;font-size:13px;font-weight:700;letter-spacing:.03em}
+.prssvg .prsnum{fill:#0f141c!important;font-size:15px;font-weight:800}
+.prssvg .prssub{fill:rgba(255,255,255,.85)!important;font-size:11.5px}
+.sitsub{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
+.sitbar{min-width:150px;white-space:nowrap}
+.sitb{position:relative;display:inline-block;width:90px;height:9px;border-radius:5px;background:var(--line);vertical-align:middle;margin-right:8px}
+.sitf{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--s1)}
+.sitt{position:absolute;top:-3px;width:2px;height:15px;background:var(--ink);margin-left:-1px}
+.sitv{font-variant-numeric:tabular-nums}
+.sitwho{font-size:13px;color:var(--ink-2);min-width:180px}
+.sittag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:9px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;background:var(--line);color:var(--ink)}
+.sittag.good{background:#d9ecdf;color:#1d5a34}.sittag.bad{background:#f6dcd7;color:#8a2a1c}
+[data-theme="dark"] .sittag.good{background:#1d4a2c;color:#bfe8cc}[data-theme="dark"] .sittag.bad{background:#5a241c;color:#ffd0c7}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .sittag.good{background:#1d4a2c;color:#bfe8cc}:root:not([data-theme="light"]) .sittag.bad{background:#5a241c;color:#ffd0c7}}
+.followbtn{margin:6px 0 2px;min-height:34px;padding:0 14px;border:1px solid var(--line);border-radius:18px;background:var(--surface-1);color:var(--ink-2);font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-weight:600;font-size:13px;letter-spacing:.04em;cursor:pointer}
+.followbtn:hover{border-color:var(--s1);color:var(--s1)}
+.followbtn[aria-pressed="true"]{background:var(--ink);color:var(--surface-1);border-color:var(--ink)}
+.heronext{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:12px 0 0;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-1);font-size:14px;color:var(--ink-2)}
+.heronext .hnk{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.heronext .hnv{font-weight:500;color:var(--ink)}
+.heronext .navlink{margin-left:auto}
+.tile.pstile .v{font-size:15px}
+.wkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin:4px 0 12px}
+.wkcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface-1);min-width:0;display:flex;flex-direction:column;gap:6px}
+.wkcard.big{max-width:560px}
+.wkwhen{margin:0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif}
+.wkteams{margin:0;font-size:17px;font-weight:700;color:var(--ink)}
+.wkcard.big .wkteams{font-size:22px}
+.wkteams .scat{font-weight:400;color:var(--muted)}
+.wkrow{display:flex;flex-wrap:wrap;gap:6px 16px}
+.wkpick{display:flex;flex-direction:column;min-width:0}
+.wkpick .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.wkpick .v{font-size:14px;font-weight:600;color:var(--ink)}
+.wkcard .navlink{align-self:flex-start;margin-top:2px}
+.dggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.dgbox{min-width:0}
+.dglist{margin:0;padding:0 0 0 18px;font-size:14px;line-height:1.6;color:var(--ink-2)}
+.dglist b{color:var(--ink)}
+.dgsub{color:var(--muted);font-size:12.5px}
+.dgpostwrap{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin:14px 0 4px}
+.dgpost{flex:1 1 320px;min-width:0;font:13px/1.45 "IBM Plex Mono",monospace;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-1);color:var(--ink-2);resize:vertical}
+@media (max-width:640px){.sitbar{min-width:120px}.sitb{width:60px}.heronext .navlink{margin-left:0}}
