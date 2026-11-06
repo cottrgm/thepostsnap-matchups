@@ -493,6 +493,24 @@
 
   /* ---- glossary: every number on the site in plain words ---- */
   var GLOSS = [
+    ['Model', 'Post-Snap model', 'The matchup board\'s game model: this season\'s results rating, plus the recruiting talent of each team\'s Two-Deep (the players who actually take the snaps), plus home field. Previews show the three pieces separately under "For [home team]".'],
+    ['Model', 'Blended with the line', 'The betting line moved part of the way toward the model, with the weight fitted only on earlier weeks. When the model has added nothing over the line so far, the weight is zero and the blend is not shown.'],
+    ['Model', 'Biggest disagreements with the line', 'This week\'s games where the model and the betting line differ most. A list of disagreements, not picks; the report card shows how those have gone.'],
+    ['Model', 'Projected bracket', 'The twelve teams most often in the simulated playoff field, seeded by average simulated seed, with each team\'s chance to reach the semifinals, the final and to win it all.'],
+    ['Model', 'Two-Deep, Starting 11, Three-Deep', 'The 11, 22 or 33 players on each side with the most PFF snaps this season. Their recruiting ratings make up a team\'s talent on the matchup board.'],
+    ['Availability', 'Injury reports', 'Conference availability reports and team news, collected every hour through RotoWire\'s injury wire, plus major stories added by hand with a link. A player ruled out drops off the Two-Deep at the next board rebuild, and the next most-snapped player moves up.'],
+    ['Availability', 'Doubtful, questionable, probable', 'The availability-report labels: doubtful means unlikely to play, questionable is uncertain, probable means expected to play.'],
+    ['Quarterbacks', 'Dropback', 'A pass attempt or sack credited to the quarterback in the play-by-play.'],
+    ['Quarterbacks', 'Adjusted EPA per dropback', 'EPA per dropback after removing how much better or worse each defense he faced is than average against the pass (schedule-adjusted ratings). Higher is better.'],
+    ['Quarterbacks', 'Deep share', 'Share of his throws the play-by-play marks as deep. A style marker, not a grade.'],
+    ['Team', 'Second-half adjustment', 'EPA per play in quarters three and four minus quarters one and two, leaving out plays with either team ahead by more than 24. Higher is better on offense, lower on defense.'],
+    ['Team', 'Six seasons', 'The same play-by-play measures for 2021 through 2026, with each season\'s FBS rank, so years can be compared.'],
+    ['Team', 'Program history, development', 'Development is opponent-adjusted net efficiency (EPA per play) against what the roster\'s recruiting talent predicts. Wins above expected compares wins with what the schedule predicts.'],
+    ['Team', 'Who is leaving against who is coming', 'Snaps by position group from players out of eligibility or announced transfers, next to the number of 2027 commits in that group.'],
+    ['Games', 'Travel', 'Straight-line miles from each team\'s home stadium to the game, the time-zone change at kickoff, and road miles so far this season.'],
+    ['Games', 'Rough weather', 'Wind of 15 mph or more, rain or snow, or 40°F or colder at kickoff. Previews show each offense in those games since 2025 against its other games.'],
+    ['Games', 'Tendency (—) in the Edge column', 'Pass rate and plays per game describe how a team plays, not how well, so neither side gets an edge for them.'],
+    ['Games', 'Live win chance', 'Starts from the model\'s pregame margin and moves with the score and time left. The line under each live game is that chance through the game so far.'],
     ['Ratings', 'SP+', 'Bill Connelly\'s tempo- and opponent-adjusted team rating, in points per game better than an average FBS team. Higher is better on offense; lower is better on defense.'],
     ['Ratings', 'Elo', 'A running power rating that moves after every game based on the result and how surprising it was. Around 1500 is average.'],
     ['Ratings', 'FPI', 'ESPN\'s Football Power Index: expected point margin against an average team on a neutral field.'],
@@ -532,6 +550,7 @@
     ['Betting', 'Cover margin', 'Final margin minus what the closing line expected. Positive means they beat the number.'],
     ['Betting', 'Over / under', 'Whether the combined score went over or under the market total.']
   ];
+  GLOSS = GLOSS.slice(18).concat(GLOSS.slice(0, 18));  /* newer entries after the core terms */
   function buildGlossary() {
     var body = document.getElementById('glossBody'), q = document.getElementById('glossQ'), cnt = document.getElementById('glossCount');
     if (!body) return;
@@ -4229,6 +4248,10 @@
       var n = document.getElementById(v.el);
       if (n) n.hidden = (v.id !== id);
     });
+    if (id !== 'team' && id !== 'scout' && id !== 'player' && id !== 'box') {
+      var vb = document.querySelector('#viewNav [data-view="' + id + '"]');
+      if (vb) document.title = vb.textContent.trim().replace(/^\w/, function (c) { return c.toUpperCase(); }) + ' · The Post-Snap';
+    }
     var nav = document.getElementById('viewNav');
     Array.prototype.forEach.call(nav.children, function (b) {
       b.setAttribute('aria-selected', b.dataset.view === id ? 'true' : 'false');
@@ -5323,6 +5346,7 @@
        claim a home field nobody had */
     document.getElementById('boxTitle').textContent =
       (away ? away.team : g.away_team) + (g.neutral_site ? ' vs ' : ' at ') + (home ? home.team : g.home_team);
+    document.title = document.getElementById('boxTitle').textContent + ' · The Post-Snap';
 
     var lede = document.getElementById('boxLede');
     /* every margin in the feed is stated from the nominal home team, so name
