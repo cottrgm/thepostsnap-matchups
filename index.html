@@ -7,6 +7,7 @@
 <meta property="og:title" content="Matchups · The Post-Snap">
 <meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f141c" media="(prefers-color-scheme: dark)">
+<script>(function(){try{var q=new URLSearchParams(location.search),t=q.get('theme')||localStorage.getItem('ps.theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);if(q.get('embed')==='1')document.documentElement.classList.add('embed');}catch(e){}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -137,8 +138,17 @@ footer{color:var(--muted);font-size:12px;display:flex;flex-direction:column;gap:
 }
 @media (prefers-reduced-motion:no-preference){.bar i,.meter i{transition:width .35s ease}}
 
-body{margin:0;padding-top:0}
-.pshead{margin-left:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1 * max(16px,env(safe-area-inset-right,0px)));margin-bottom:18px;position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+body{margin:0;padding-top:0;
+  --hero-rule:#151b260a; --hero-1:#ffffff; --hero-2:#eef1f6; --nav-bg:rgba(243,245,248,.92);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 79px, var(--hero-rule) 79px 80px) top left/100% 560px no-repeat,
+    radial-gradient(120% 560px at 12% 0%, var(--hero-1) 0%, var(--hero-2) 55%, var(--bg) 100%) top left/100% 560px no-repeat,
+    var(--bg)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) body{--hero-rule:#ffffff08; --hero-1:#1a2333; --hero-2:#141b27; --nav-bg:rgba(15,20,28,.9)}}
+:root[data-theme="dark"] body{--hero-rule:#ffffff08; --hero-1:#1a2333; --hero-2:#141b27; --nav-bg:rgba(15,20,28,.9)}
+html.embed body{background:transparent;padding-block:0 8px}
+html.embed .pshead{display:none}
+.pshead{margin-left:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1 * max(16px,env(safe-area-inset-right,0px)));margin-bottom:18px;position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--nav-bg);-webkit-backdrop-filter:saturate(140%) blur(10px);backdrop-filter:saturate(140%) blur(10px)}
 .pshead a{color:var(--ink);text-decoration:none}
 :root{--pslogo:url("__PS_LOGO__")}
 .pshead .wordmark{display:block;width:148px;height:41px;flex:none;background:var(--ink);-webkit-mask:var(--pslogo) left center/contain no-repeat;mask:var(--pslogo) left center/contain no-repeat}
@@ -314,6 +324,16 @@ if (!['sc','d','avg','cur','nr','team'].includes(S.clsSort)) S.clsSort = 'sc';
 if (S.clsV !== 2) { S.clsSort = 'sc'; S.clsSortDir = undefined; S.clsV = 2; }
 let saved = false; try { saved = !!localStorage.getItem('fbsMatchup'); } catch(e) {}
 if (!D.teams[S.A]) S.A = 'Auburn'; if (!D.teams[S.B]) S.B = 'Alabama';
+const QP = new URLSearchParams(location.search); window.__EMBED = QP.get('embed') === '1';
+if (QP.get('a') && D.teams[QP.get('a')]) {
+  S.A = QP.get('a');
+  const games = D.schedule.filter(g => g[2] === S.A || g[3] === S.A).sort((a, b) => a[0] - b[0]);
+  const want = QP.get('b') && D.teams[QP.get('b')] ? QP.get('b') : null;
+  const g = want ? games.find(x => x[2] === want || x[3] === want) : games[0];
+  if (want) S.B = want; else if (g) S.B = g[2] === S.A ? g[3] : g[2]; else if (S.B === S.A) S.B = TEAMS.find(t => t !== S.A);
+  S.site = g ? (g[4] ? 'N' : (g[2] === S.A ? 'A' : 'B')) : 'N';
+  saved = true;
+}
 if (!saved){ const nx = D.schedule.filter(g => g[2] === 'Auburn' || g[3] === 'Auburn').sort((a,b) => a[0]-b[0])[0]; if (nx){ S.A = 'Auburn'; S.B = nx[2] === 'Auburn' ? nx[3] : nx[2]; S.site = nx[4] ? 'N' : (nx[2] === 'Auburn' ? 'A' : 'B'); } }
 const $ = id => document.getElementById(id);
 const fmt = (v, d=1) => v == null ? '–' : (+v).toFixed(d);
@@ -388,7 +408,7 @@ function projection(){
 
 // ---------- render ----------
 function render(){
-  try { localStorage.setItem('fbsMatchup', JSON.stringify(S)); } catch(e) {}
+  if (!window.__EMBED) try { localStorage.setItem('fbsMatchup', JSON.stringify(S)); } catch(e) {}
   $('teamA').value = S.A; $('teamB').value = S.B; $('svc').value = S.svc;
   for (const [id, key] of [['schTeam','schTeam'],['clsScope','clsScope'],['yr','yr'],['site','site'],['tier','tier'],['unr','unr'],['tblSide','tblSide'],['rosTeam','rosTeam']])
     $(id).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v == S[key])));
@@ -675,6 +695,11 @@ $('sheet').addEventListener('click', e => { if (e.target === $('sheet')) $('shee
 const last = new Date(D.last_played);
 $('asof').textContent = `2026 depth charts and recruiting ratings for all ${TEAMS.length} FBS teams · results through ${last.toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'America/Chicago'})}`;
 $('foot').innerHTML = `<span>Players ranked by PFF season-to-date snaps on each side of the ball: the 11, 22 and 33 most-snapped players. Refreshed weekly from PFF.</span><span>Original high-school ratings from 247Sports, 247 Composite (via CollegeFootballData), On3, On3 Industry, ESPN and Rivals. Portal-only ratings count at a ${Math.round(D.discount*100)}% discount above each service's 2-star floor.</span><span>Results, SP+, FPI and Elo from CollegeFootballData. Market lines are the median across books.</span>`;
+if (window.__EMBED && window.parent !== window) {
+  const post = () => window.parent.postMessage({psMatchupsHeight: document.documentElement.scrollHeight}, location.origin);
+  new ResizeObserver(post).observe(document.body); post();
+  window.addEventListener('message', e => { if (e.origin === location.origin && e.data && e.data.psTheme !== undefined) { const t = e.data.psTheme; if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); } });
+}
 render();
 document.getElementById('psload').hidden = true;
 })().catch(e => { document.getElementById('psload').textContent = 'The matchup data did not load. Refresh to try again.'; console.error(e); });
