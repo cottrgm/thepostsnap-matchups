@@ -224,12 +224,12 @@
      deeper numbers) share one filter bar and one offense/defense switch, and only load when
      their tab is open. The address bar always holds the current view, so a link reopens it. */
   var TEAM_TABS = [
-    { id: 'overview', label: 'Overview', nums: ['01', '21', '20', '02', '03', '04', '07', '16'] },
+    { id: 'overview', label: 'Overview', nums: ['01', '21', '20', '02', '03', '07', '16'] },
     { id: 'playcalling', label: 'Playcalling', nums: ['12', '13', '06'] },
     { id: 'field', label: 'On the field', nums: ['14', '05'] },
     { id: 'units', label: 'Players & units', nums: ['15', '17', '08'] },
     { id: 'matchups', label: 'Matchups', nums: ['19'] },
-    { id: 'compare', label: 'Compare', nums: ['09', '18', '11', '10'] }
+    { id: 'compare', label: 'Compare', nums: ['09', '18', '11', '10', '04'] }
   ];
   var LIVE = {
     '12': function () { buildPCChart(); }, '13': function () { buildTend(); },
