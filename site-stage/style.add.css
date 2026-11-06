@@ -1,0 +1,6 @@
+
+/* ---------- share cards ---------- */
+.sharemenu{position:absolute;left:0;top:calc(100% - 2px);z-index:40;display:flex;flex-direction:column;min-width:220px;padding:6px;border:1px solid var(--line);border-radius:10px;background:var(--surface-1);box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.sharemenu button{all:unset;cursor:pointer;padding:9px 12px;border-radius:7px;font:500 14px "IBM Plex Sans",sans-serif;color:var(--ink)}
+.sharemenu button:hover,.sharemenu button:focus-visible{background:var(--line)}
+@media (max-width:640px){.shareimg{display:inline-block;grid-column:2;justify-self:end;margin-top:6px}.sharemenu{left:auto;right:0}}

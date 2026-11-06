@@ -386,29 +386,94 @@
     });
     return h2cLoading;
   }
+  /* ---- share cards: a section framed for social, sized for where it is going ---- */
+  var CARD_SIZES = { wide: [1200, 675, 'X / wide'], square: [1080, 1080, 'Square'], tall: [1080, 1350, 'Portrait'], raw: [0, 0, 'Just the section'] };
+  function shareContext() {
+    if (vstate.view === 'team') return state.team + ' · ' + state.season + (pcFilterText() ? ' · ' + pcFilterText() : '');
+    var t = document.title.replace(/ · The Post-Snap$/, '');
+    return t + ' · ' + state.season;
+  }
+  function makeCard(panel, title, fmt) {
+    return loadH2C().then(function () {
+      panel.classList.add('snapping');
+      var rootCss = getComputedStyle(document.querySelector('.viz-root'));
+      var surf = rootCss.getPropertyValue('--surface-1').trim() || '#ffffff';
+      return window.html2canvas(panel, { backgroundColor: surf, scale: 2, useCORS: true, logging: false,
+        ignoreElements: function (el) { return el.classList && (el.classList.contains('shareimg') || el.classList.contains('sharemenu') || el.tagName === 'SELECT'); } })
+        .then(function (shot) {
+          panel.classList.remove('snapping');
+          var ink = rootCss.getPropertyValue('--ink').trim() || '#111827', muted = rootCss.getPropertyValue('--muted').trim() || '#6b7280',
+            accent = rootCss.getPropertyValue('--s1').trim() || '#1f4fbf', bg = rootCss.getPropertyValue('--bg').trim() || surf;
+          var sz = CARD_SIZES[fmt] || CARD_SIZES.raw, ctx;
+          if (!sz[0]) {
+            ctx = shot.getContext('2d'); ctx.font = '600 22px "IBM Plex Sans", sans-serif'; ctx.fillStyle = muted; ctx.textAlign = 'right';
+            ctx.fillText('thepostsnap.com · ' + shareContext(), shot.width - 24, shot.height - 18);
+            return shot;
+          }
+          var W = sz[0], H = sz[1], c = document.createElement('canvas'); c.width = W; c.height = H; ctx = c.getContext('2d');
+          ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = accent; ctx.fillRect(0, 0, W, 10);
+          var pad = 44, headH = 118, footH = 58;
+          ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+          ctx.fillStyle = ink; ctx.font = '800 30px "Big Shoulders Display", "IBM Plex Sans Condensed", sans-serif';
+          ctx.fillText('THE POST-SNAP', pad, 58);
+          ctx.fillStyle = muted; ctx.font = '600 20px "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif';
+          ctx.fillText(shareContext().toUpperCase(), pad, 90);
+          ctx.textAlign = 'right'; ctx.fillStyle = ink; ctx.font = '700 34px "Big Shoulders Display", "IBM Plex Sans Condensed", sans-serif';
+          var tt = title.toUpperCase(); while (ctx.measureText(tt).width > W * 0.52 && tt.length > 8) tt = tt.slice(0, -2);
+          if (tt !== title.toUpperCase()) tt += '…';
+          ctx.fillText(tt, W - pad, 64);
+          /* the section, scaled to fit the space between header and footer */
+          var bw = W - pad * 2, bh = H - headH - footH - 16, k = Math.min(bw / shot.width, bh / shot.height);
+          var dw = shot.width * k, dh = shot.height * k, dx = (W - dw) / 2, dy = headH + (bh - dh) / 2;
+          ctx.fillStyle = surf; ctx.fillRect(dx - 2, dy - 2, dw + 4, dh + 4);
+          ctx.drawImage(shot, dx, dy, dw, dh);
+          ctx.textAlign = 'left'; ctx.fillStyle = muted; ctx.font = '500 19px "IBM Plex Sans", sans-serif';
+          ctx.fillText('thepostsnap.com', pad, H - 24);
+          ctx.textAlign = 'right';
+          ctx.fillText(new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }), W - pad, H - 24);
+          return c;
+        });
+    }).catch(function (e) { panel.classList.remove('snapping'); throw e; });
+  }
+  function deliverCard(canvas, name) {
+    return new Promise(function (ok) {
+      canvas.toBlob(function (blob) {
+        var file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { file = null; }
+        if (file && navigator.canShare && navigator.canShare({ files: [file] }) && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+          navigator.share({ files: [file], title: name.replace(/\.png$/, ''), text: 'thepostsnap.com' }).then(ok, ok); return;
+        }
+        var a = document.createElement('a'); a.download = name; a.href = URL.createObjectURL(blob);
+        document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); ok();
+      }, 'image/png');
+    });
+  }
   function addShareButtons() {
-    [].forEach.call(document.querySelectorAll('#viewTeam main > section.panel > .phead'), function (head) {
+    [].forEach.call(document.querySelectorAll('#viewTeam main > section.panel > .phead, #viewScout section.panel > .phead, #viewWeek section.panel > .phead'), function (head) {
       if (head.querySelector('.shareimg') || head.parentNode.hasAttribute('data-noshare')) return;
-      var b = h('button', 'shareimg', 'Save image');
-      b.type = 'button'; b.title = 'Download this section as a PNG';
+      var b = h('button', 'shareimg', 'Share');
+      b.type = 'button'; b.title = 'Save this section as an image, framed for social media';
+      var menu = null;
       b.onclick = function (ev) {
         ev.stopPropagation();
-        var panel = head.parentNode, title = (head.querySelector('h2') || {}).textContent || 'section';
-        b.textContent = 'Saving…';
-        loadH2C().then(function () {
-          panel.classList.add('snapping');
-          var bg = getComputedStyle(document.querySelector('.viz-root')).getPropertyValue('--surface-1').trim() || '#ffffff';
-          return window.html2canvas(panel, { backgroundColor: bg, scale: 2, useCORS: true, logging: false,
-            ignoreElements: function (el) { return el.classList && (el.classList.contains('shareimg') || el.tagName === 'SELECT'); } });
-        }).then(function (canvas) {
-          panel.classList.remove('snapping');
-          var ctx = canvas.getContext('2d'); ctx.font = '600 22px "IBM Plex Sans", sans-serif'; ctx.fillStyle = 'rgba(120,130,145,.9)'; ctx.textAlign = 'right';
-          ctx.fillText('thepostsnap.com · ' + state.team + ' ' + state.season + (pcFilterText() ? ' · ' + pcFilterText() : ''), canvas.width - 24, canvas.height - 18);
-          var a = document.createElement('a');
-          a.download = (state.team + ' ' + title).replace(/[^A-Za-z0-9 &-]+/g, '').replace(/\s+/g, ' ').trim() + '.png';
-          a.href = canvas.toDataURL('image/png'); document.body.appendChild(a); a.click(); a.remove();
-          b.textContent = 'Save image';
-        }).catch(function (e) { panel.classList.remove('snapping'); b.textContent = 'Could not save'; setTimeout(function () { b.textContent = 'Save image'; }, 2500); console.error(e); });
+        if (menu) { menu.remove(); menu = null; return; }
+        menu = h('div', 'sharemenu');
+        Object.keys(CARD_SIZES).forEach(function (k) {
+          var o = h('button', null, CARD_SIZES[k][2] + (CARD_SIZES[k][0] ? ' · ' + CARD_SIZES[k][0] + '×' + CARD_SIZES[k][1] : ''));
+          o.type = 'button';
+          o.onclick = function (e2) {
+            e2.stopPropagation(); menu.remove(); menu = null;
+            var panel = head.parentNode, title = (head.querySelector('h2') || {}).textContent || 'section';
+            b.textContent = 'Making…';
+            makeCard(panel, title, k).then(function (cv) {
+              return deliverCard(cv, (shareContext().split(' · ')[0] + ' ' + title + (k === 'raw' ? '' : ' ' + k)).replace(/[^A-Za-z0-9 &-]+/g, '').replace(/\s+/g, ' ').trim() + '.png');
+            }).then(function () { b.textContent = 'Share'; })
+              .catch(function (e) { b.textContent = 'Could not save'; setTimeout(function () { b.textContent = 'Share'; }, 2500); console.error(e); });
+          };
+          menu.appendChild(o);
+        });
+        head.appendChild(menu);
+        setTimeout(function () { document.addEventListener('click', function close() { if (menu) { menu.remove(); menu = null; } document.removeEventListener('click', close); }); }, 0);
       };
       head.appendChild(b);
     });
@@ -2986,6 +3051,7 @@
     var p6 = scPanel(root, '06', 'Key matchups', 'Who gets the ball and where, against how the other side defends those spots; the run lanes; and the offensive line against the pass rush.');
     var p7 = scPanel(root, '07', 'Situations', 'Third downs, the red zone, the two-minute drill and the first series after a turnover: the offense\'s habits against what the defense allows.');
     var p8 = scPanel(root, '08', 'Fourth downs', 'How each coaching staff handles fourth down, graded against an expected-points model.');
+    setTimeout(addShareButtons, 50);
     var side = function (team, sd) { return 'team=' + encodeURIComponent(team) + '&season=' + s + '&side=' + sd; };
     var dir = 0;
     function draw() {
@@ -3185,6 +3251,7 @@
       drawReport(cardB, D);
     }).catch(function (e) { p5Fail(mineB, e); p5Fail(gamesB, e); p5Fail(cardB, e); });
     xGet('digest', { season: state.season }).then(function (j) { drawDigest(digB, j); }).catch(function (e) { p5Fail(digB, e); });
+    setTimeout(addShareButtons, 50);
   }
   var weekKick = {};
   function weekCard(D, g, home, away, mm, big) {
