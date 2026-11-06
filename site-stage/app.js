@@ -225,7 +225,7 @@
      their tab is open. The address bar always holds the current view, so a link reopens it. */
   var TEAM_TABS = [
     { id: 'overview', label: 'Overview', nums: ['01', '21', '20', '02', '03', '07', '16'] },
-    { id: 'playcalling', label: 'Playcalling', nums: ['12', '13', '23', '24', '06'] },
+    { id: 'playcalling', label: 'Playcalling', nums: ['12', '13', '23', '24', '29', '06'] },
     { id: 'field', label: 'On the field', nums: ['14', '05'] },
     { id: 'units', label: 'Players & units', nums: ['15', '22', '27', '28', '17', '08'] },
     { id: 'matchups', label: 'Matchups', nums: ['19'] },
@@ -266,7 +266,7 @@
   function muQueue() { if (muQueued) return; muQueued = true; setTimeout(function () { muQueued = false; muView(); }, 60); }
   window.addEventListener('scroll', muQueue, { passive: true });
   window.addEventListener('resize', muQueue);
-  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); } };
+  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); } };
   state.teamTab = state.teamTab || 'overview'; state.gSide = state.gSide || 0;
   state.liveKey = 0; state.liveDone = {};
 
@@ -3061,14 +3061,18 @@
       var tiles = document.getElementById('scoutTiles'); if (!tiles) return;
       var d = h('div', 'tile pstile'); d.appendChild(h('span', 'k', 'Post-Snap model')); d.appendChild(h('span', 'v', pickTxt(B, A, mm)));
       var bt = blendTxt(D, mm, g.spread, B, A); if (bt) d.appendChild(h('span', 'r', 'Blended with the line: ' + bt));
+      var wy = whyTxt(D, B, A, g.neutral_site); if (wy) d.appendChild(h('span', 'r', wy));
       d.title = 'The matchup board\'s model: this season\'s results rating plus Two-Deep recruiting talent and home field. Win chance in parentheses.';
       tiles.insertBefore(d, tiles.firstChild);
     }).catch(function () {});
     var p6 = scPanel(root, '06', 'Key matchups', 'Who gets the ball and where, against how the other side defends those spots; the run lanes; and the offensive line against the pass rush.');
     var p7 = scPanel(root, '07', 'Situations', 'Third downs, the red zone, the two-minute drill and the first series after a turnover: the offense\'s habits against what the defense allows.');
     var p8 = scPanel(root, '08', 'Fourth downs', 'How each coaching staff handles fourth down, graded against an expected-points model.');
+    var p9 = scPanel(root, '09', 'Injury reports', 'Who is out, doubtful or questionable for this game, from the conference availability reports and team news.');
+    scInjuries(p9.body, A, B);
     if (!g.played) scRest(g, A, B);
     scTravel(g, A, B);
+    scWeather(g, A, B);
     setTimeout(addShareButtons, 50);
     var side = function (team, sd) { return 'team=' + encodeURIComponent(team) + '&season=' + s + '&side=' + sd; };
     var dir = 0;
@@ -3274,6 +3278,7 @@
       gamesB.appendChild(watch);
       var all = h('button', 'navlink', 'Full slate with every line →'); all.type = 'button'; all.onclick = function () { vstate.week = wk; vstate.games = null; setView('games'); };
       gamesB.appendChild(all);
+      try { drawUpsets(gamesB, D, list); } catch (e) { console.error(e); }
       /* report card */
       drawReport(cardB, D);
       drawPickem(pickB, D, wk);
@@ -3865,6 +3870,7 @@
         tr2.appendChild(td('nd', '–')); tr2.appendChild(td('nd', '–')); tr2.appendChild(td('nd', '–')); X.tb.appendChild(tr2);
       }
       p.body.appendChild(X.wrap);
+      qbCompare(p.body, me, j);
       p.body.appendChild(h('p', 'tblnote', 'A dropback is a pass attempt or sack credited to him in the play-by-play text. "Deep" and "short" are the feed\'s own labels. Sack rate ranks low as good. Completion rate, yards and touchdowns stay in the official numbers above; this table is about how the plays went. The play-by-play has no record of pressure or blitzes for each quarterback, so those splits are not shown.'));
     }).catch(function (e) { p5Fail(p.body, e); });
   }
@@ -3931,6 +3937,7 @@
         X.tb.appendChild(tr);
       });
       host.appendChild(X.wrap);
+      scGet('api/matchups-data').then(function (D) { if (team === state.team) drawTurnover(host, D, team); }).catch(function () {});
       host.appendChild(h('p', 'tblnote', 'Commitments from the 247Sports composite through CollegeFootballData; they can change until signing day. The two-deep is the most-snapped players this season at the same spot (two at quarterback, running back and tight end; four at tackle, edge, interior defensive line, linebacker, corner and safety; six at receiver and interior line). Their high-school ratings are matched by name, so transfers and walk-ons without a rating are left out of the comparison. A higher rating is no promise of playing time; it says where the newcomer starts in the room.'));
     }).catch(function (e) { p5Fail(host, e); });
   }
@@ -4003,6 +4010,179 @@
     var k = blendK(D.report.filter(function (r) { return r[5] != null; })), mk = -spread, b = mk + k * (mm.margin - mk);
     if (k < 0.05) return null;
     return (b >= 0 ? home : away) + ' by ' + num(Math.abs(b), 1);
+  }
+
+  /* =====================================================================
+     Round 7: injury reports, why the model likes a pick, upset watch,
+     halves, QB rankings and comparisons, weather, who leaves vs who comes.
+     ===================================================================== */
+  var INJ_LABEL = { season: 'Out for season', out: 'Out', doubtful: 'Doubtful', questionable: 'Questionable', probable: 'Probable', available: 'Available', news: 'Update' };
+  function scInjuries(host, A, B) {
+    p5Loading(host);
+    xGet('injuries', { teams: A + '|' + B }).then(function (list) {
+      host.innerHTML = '';
+      list = list || [];
+      [A, B].forEach(function (t) {
+        var mine = list.filter(function (x) { return x.team === t; });
+        host.appendChild(h('h3', 'fdh', t));
+        if (!mine.length) { host.appendChild(h('p', 'ax', 'No injury reports for ' + t + ' in the last ten days.')); return; }
+        var X = tbl(['Player', 'Pos', 'Status', 'Report', 'Date']);
+        mine.forEach(function (x) {
+          var tr = h('tr'); tr.appendChild(td('pclab', x.player)); tr.appendChild(td('nd', x.pos || '–'));
+          var st = td('nd injst ' + x.status, INJ_LABEL[x.status] || x.status); tr.appendChild(st);
+          var rp = h('td'); rp.appendChild(document.createTextNode(x.headline + (x.injury ? ' (' + x.injury.toLowerCase() + ')' : '') + ' '));
+          if (x.url) { var a = h('a', 'plink', x.source); a.href = x.url; a.target = '_blank'; a.rel = 'noopener'; rp.appendChild(a); }
+          tr.appendChild(rp); tr.appendChild(td('nd', x.reported ? x.reported.slice(5).replace('-', '/') : '–'));
+          X.tb.appendChild(tr);
+        });
+        host.appendChild(X.wrap);
+      });
+      host.appendChild(h('p', 'tblnote', 'From the conference availability reports and team news, collected every hour through RotoWire\'s injury wire, plus reports added by hand when a major one breaks. Status is read from the report\'s wording. Players ruled out are marked "(out)" in the tables above, and the matchup board drops them from the Two-Deep at its next rebuild.'));
+      var outs = list.filter(function (x) { return x.status === 'out' || x.status === 'season'; });
+      function flag() {
+        var root = document.getElementById('scoutBody') || document;
+        outs.forEach(function (x) {
+          var parts = x.player.replace(/\s+(Jr\.?|Sr\.?|II|III|IV)$/, '').split(/\s+/), abbr = parts[0].charAt(0) + '.' + parts[parts.length - 1];
+          [].forEach.call(root.querySelectorAll('td, li, span'), function (c) {
+            if (c.children.length || c.dataset.injFlag || c.textContent.indexOf(abbr) < 0) return;
+            c.textContent = c.textContent.split(abbr).join(abbr + ' (out)'); c.dataset.injFlag = '1';
+          });
+        });
+      }
+      if (outs.length) { flag(); setTimeout(flag, 2500); setTimeout(flag, 6000); }
+    }).catch(function (e) { p5Fail(host, e); });
+  }
+
+  /* ---- the model's margin, piece by piece ---- */
+  function whyTxt(D, home, away, neutral) {
+    var m = D && D.models && D.models['22']; if (!m) return '';
+    var H = SC_BOARD_NAME[home] || home, A = SC_BOARD_NAME[away] || away;
+    if (m.rt[H] == null || m.rt[A] == null) return '';
+    var res = m.rt[H] - m.rt[A], tal = D.beta * (m.tal[H] - m.tal[A]), hf = neutral ? 0 : m.hfa;
+    return 'For ' + home + ': results ' + sgn(res, 1) + ' · Two-Deep talent ' + sgn(tal, 1) + ' · home field ' + sgn(hf, 1);
+  }
+
+  /* ---- This week: where the model and the line disagree most ---- */
+  function drawUpsets(host, D, list) {
+    var rows = list.filter(function (x) { return x.mm && x.g[5] != null; }).map(function (x) { x.gap = x.mm.margin + x.g[5]; return x; })
+      .sort(function (a, b) { return Math.abs(b.gap) - Math.abs(a.gap); }).slice(0, 6);
+    if (!rows.length) return;
+    host.appendChild(h('h3', 'fdh', 'Biggest disagreements with the line'));
+    var X = tbl(['Game', 'Post-Snap', 'Line', 'Model leans']);
+    rows.forEach(function (x) {
+      var tr = h('tr', 'clickable'); tr.appendChild(td('pclab', x.away + (x.g[4] ? ' vs ' : ' at ') + x.home));
+      tr.appendChild(td('nd', pickTxt(x.home, x.away, x.mm))); tr.appendChild(td('nd', lineTxt(x.home, x.away, x.g[5])));
+      tr.appendChild(td('nd', (x.gap > 0 ? x.home : x.away) + ' by ' + num(Math.abs(x.gap), 1) + ' more'));
+      tr.onclick = function () { openPreview(x.g[0], x.home, x.away); };
+      X.tb.appendChild(tr);
+    });
+    host.appendChild(X.wrap);
+    var R = (D.report || []).filter(function (r) { return r[5] != null && Math.abs(r[4] - r[5]) >= 7 && r[6] !== r[5]; });
+    var w = R.filter(function (r) { return ((r[4] - r[5]) > 0) === ((r[6] - r[5]) > 0); }).length;
+    host.appendChild(h('p', 'tblnote', 'These are the games where the Post-Snap model is furthest from the betting line, not picks. ' +
+      (R.length ? 'This season, when the two differed by 7 points or more, the final margin landed on the model\'s side ' + w + ' times in ' + R.length + ' (' + pct(w / R.length, 0) + '). ' : '') +
+      'The line usually knows something the model does not, like injuries and weather.'));
+  }
+
+  /* ---- team page: first half against second half ---- */
+  function buildHalves() {
+    var host = document.getElementById('halvesBody'); if (!host) return;
+    var team = state.team; p5Loading(host);
+    xGet('halves', { team: team, season: state.season }).then(function (rows) {
+      if (team !== state.team) return;
+      host.innerHTML = '';
+      if (!rows || !rows.length) { host.appendChild(h('p', 'ax', 'No FBS numbers for ' + team + ' this season.')); return; }
+      var X = tbl(['', '1st half EPA/play', '2nd half EPA/play', 'Change', 'Rank of the change', '1st half success', '2nd half success']);
+      rows.forEach(function (r) {
+        var tr = h('tr'); tr.appendChild(td('pclab', r.side));
+        tr.appendChild(td('nd', sgn(+r.h1_epa, 2))); tr.appendChild(td('nd', sgn(+r.h2_epa, 2))); tr.appendChild(td('nd', sgn(+r.d_epa, 2)));
+        var c = td('nd pcshade', r.d_rank ? '#' + r.d_rank + ' of ' + r.pool : '–'); if (r.d_rank) c.style.background = xRankBg(r.d_rank, r.pool); tr.appendChild(c);
+        tr.appendChild(td('nd', pct(+r.h1_sr, 1))); tr.appendChild(td('nd', pct(+r.h2_sr, 1)));
+        X.tb.appendChild(tr);
+      });
+      host.appendChild(X.wrap);
+      host.appendChild(h('p', 'tblnote', 'Runs, passes and sacks in quarters one and two against three and four, leaving out plays with either team ahead by more than 24 so blowouts do not decide it. On offense a rise is good; on defense a drop is good, and the ranks read that way. A big lead can still bring in backups before the 24-point cutoff, so read a second-half dip next to the score.'));
+    }).catch(function (e) { p5Fail(host, e); });
+  }
+
+  /* ---- player page: put another quarterback beside him ---- */
+  var QB_ROWS = null;
+  function qbCompare(host, me, j) {
+    var get = QB_ROWS ? Promise.resolve(QB_ROWS) : xGet('qb_rows', { season: j.season }).then(function (x) { QB_ROWS = x.rows || []; return QB_ROWS; });
+    get.then(function (rows) {
+      var mine = rows.filter(function (r) { return r.school === j.team && r.qb === me.qb; })[0];
+      if (!mine) return;
+      var box = h('div', 'qbcmp'); host.appendChild(box);
+      var lab = h('label', 'ctl'); lab.appendChild(h('span', null, 'Compare with another quarterback'));
+      var sel = document.createElement('select'); sel.appendChild(new Option('Pick one…', ''));
+      rows.filter(function (r) { return r !== mine; }).sort(function (a, b) { return a.team.localeCompare(b.team); }).forEach(function (r, i) { sel.appendChild(new Option(r.team, rows.indexOf(r))); });
+      lab.appendChild(sel); box.appendChild(lab);
+      var out = h('div'); box.appendChild(out);
+      sel.onchange = function () {
+        out.innerHTML = ''; var o = rows[+sel.value]; if (!o) return;
+        var X = tbl(['', j.athlete, o.team.split(' · ')[0] + ' (' + o.school + ')']);
+        [['EPA per dropback, adjusted for defenses faced', 'adj', 2, 'adj_rank'], ['EPA per dropback', 'epa', 2, 'epa_rank'], ['Success rate', 'sr', 'p', 'sr_rank'],
+         ['Sack rate', 'sack', 'p', 'sack_rank'], ['Share of throws deep', 'deep', 'p', null], ['Dropbacks', 'db', 0, null], ['PFF passing grade', 'pff', 1, null]].forEach(function (m) {
+          var tr = h('tr'); tr.appendChild(td('pclab', m[0]));
+          [mine, o].forEach(function (r, k) {
+            var v = r[m[1]], c = td('nd', v == null ? '–' : m[2] === 'p' ? pct(+v, 1) : num(+v, m[2]) + (m[3] && r[m[3]] ? ' · #' + r[m[3]] : ''));
+            if (m[2] === 'p' && m[3] && r[m[3]]) c.textContent += ' · #' + r[m[3]];
+            var other = [mine, o][1 - k][m[1]];
+            if (v != null && other != null && m[1] !== 'db' && m[1] !== 'deep' && (m[1] === 'sack' ? +v < +other : +v > +other)) c.className = 'nd qbwin';
+            tr.appendChild(c);
+          });
+          X.tb.appendChild(tr);
+        });
+        out.appendChild(X.wrap);
+      };
+    }).catch(function () {});
+  }
+
+  /* ---- scouting: the forecast and how each offense has done in rough weather ---- */
+  function scWeather(g, A, B) {
+    xGet('weather', { home: B, away: A }).then(function (j) {
+      var tiles = document.getElementById('scoutTiles'); if (!tiles || !j) return;
+      var f = j.forecast, S = j.splits || [];
+      if (!f && !S.length) return;
+      var d = h('div', 'tile'); d.appendChild(h('span', 'k', g.played ? 'Weather' : 'Forecast'));
+      var bits = [];
+      if (f && f.temperature != null) bits.push(Math.round(f.temperature) + '°F');
+      if (f && f.wind_speed != null) bits.push('wind ' + Math.round(f.wind_speed) + ' mph');
+      if (f && f.weather_condition) bits.push(String(f.weather_condition).toLowerCase());
+      d.appendChild(h('span', 'v resttxt', bits.length ? bits.join(' · ') : 'not posted yet'));
+      var lines = [A, B].map(function (t) {
+        var r = S.filter(function (x) { return x.team === t && x.rough; })[0], n = S.filter(function (x) { return x.team === t && !x.rough; })[0];
+        return r && n ? t + ' offense in cold, wind or rain: ' + sgn(r.epa, 2) + ' EPA/play in ' + r.games + (r.games === 1 ? ' game' : ' games') + ' (' + sgn(n.epa, 2) + ' otherwise)' : t + ': no rough-weather games since 2025';
+      });
+      d.appendChild(h('span', 'r', lines.join(' · ')));
+      d.title = 'Rough weather = wind 15 mph or more, rain or snow, or 40°F or colder at kickoff, in 2025 and 2026 games.';
+      tiles.appendChild(d);
+    }).catch(function () {});
+  }
+
+  /* ---- recruiting panel: snaps walking out the door against the class coming in ---- */
+  function drawTurnover(host, D, team) {
+    var T = SC_BOARD_NAME[team] || team, P = (D.players || []).filter(function (p) { return p[0] === T; });
+    if (!P.length) return;
+    var g = {};
+    P.forEach(function (p) {
+      var k = p[9] || p[3]; g[k] = g[k] || { snaps: 0, leaving: 0, nLeave: 0, commits: 0, names: [] };
+      if (p[6] === 'C') { g[k].commits++; return; }
+      g[k].snaps += +p[15] || 0;
+      if (p[14] === 'E' || p[14] === 'P') { g[k].leaving += +p[15] || 0; g[k].nLeave++; if ((+p[15] || 0) >= 150) g[k].names.push(p[4]); }
+    });
+    var keys = Object.keys(g).filter(function (k) { return g[k].snaps || g[k].commits; }).sort(function (a, b) { return (g[b].leaving / Math.max(1, g[b].snaps)) - (g[a].leaving / Math.max(1, g[a].snaps)); });
+    host.appendChild(h('h3', 'fdh', 'Who is leaving against who is coming'));
+    var X = tbl(['Group', 'Snaps leaving', 'Share of the group\'s snaps', 'Main players leaving', '2027 commits']);
+    keys.forEach(function (k) {
+      var x = g[k], tr = h('tr'); tr.appendChild(td('pclab', k));
+      tr.appendChild(td('nd', x.leaving ? x.leaving.toLocaleString() + ' (' + x.nLeave + ')' : '–'));
+      var sh = x.snaps ? x.leaving / x.snaps : 0, c = td('nd pcshade', x.snaps ? pct(sh, 0) : '–'); c.style.background = shade(1 - Math.min(1, sh)); tr.appendChild(c);
+      tr.appendChild(td(null, x.names.slice(0, 4).join(', ') || '–')); tr.appendChild(td('nd', x.commits || '–'));
+      X.tb.appendChild(tr);
+    });
+    host.appendChild(X.wrap);
+    host.appendChild(h('p', 'tblnote', 'Snaps are this season\'s PFF snaps for the Three-Deep at each position group on the matchup board. Leaving means out of eligibility after this season or an announced transfer; players who could return for another year are not counted, and the portal will change this in December. Commits are the 2027 high-school class by the board\'s position groups.'));
   }
 
   /* =====================================================================
@@ -4376,7 +4556,7 @@
       var o = scRank(offRows, off, m[0], m[3]), d = scRank(defRows, def, m[0], -m[3]);
       var tr = h('tr'); tr.appendChild(h('td', 'pclab', m[1]));
       tr.appendChild(scRankCell(o, m[2])); tr.appendChild(scRankCell(d, m[2]));
-      tr.appendChild(m[3] ? scEdge(o, d) : h('td', 'scedge nd', 'style'));
+      if (m[3]) tr.appendChild(scEdge(o, d)); else { var sx = h('td', 'scedge nd', '—'); sx.title = 'A tendency, not a strength: passing more or playing faster is not better or worse by itself, so neither side gets an edge here.'; tr.appendChild(sx); }
       tb.appendChild(tr);
     });
     var MO = (exO && exO.metrics) || {}, MD = (exD && exD.metrics) || {};
@@ -5346,6 +5526,31 @@
         ['epa_run', 'Run EPA', S2, 'epa_run_rank'],
         ['raw_rank', 'Raw rank', N0, null],
         ['move', 'Moved', N0, null]
+      ] },
+    { id: 'qbs', label: 'Quarterbacks', sided: false, who: 'Quarterback', teamKey: 'school',
+      url: function () { return 'api/x/qb_rows?season=' + state.season; },
+      lede: 'Every FBS quarterback with 100 or more dropbacks, ranked by EPA per dropback after adjusting for the pass defenses he faced.',
+      note: 'A dropback is a pass or sack credited to him in the play-by-play. The adjusted number takes each play\'s expected points and removes how much better or worse that defense is than average against the pass (schedule-adjusted, the same ratings as the Schedule-adjusted view). Sack rate: lower is better. Tap a name for his team.',
+      cols: [
+        ['adj', 'Adj. EPA/db', S2, 'adj_rank'],
+        ['epa', 'EPA/db', S2, 'epa_rank'],
+        ['sr', 'Success', P1, 'sr_rank'],
+        ['sack', 'Sack rate', P1, 'sack_rank'],
+        ['deep', 'Deep share', P1, null],
+        ['db', 'Dropbacks', N0, null],
+        ['pff', 'PFF pass', N1, null]
+      ] },
+    { id: 'halves', label: 'Second-half adjustments', sided: true,
+      url: function (side) { return 'api/x/halves_league?season=' + state.season + '&side=' + side; },
+      lede: 'Who gets better after halftime. EPA per play in the first half against the second, with blowout plays (either team up 25 or more) left out.',
+      note: 'On offense a positive change is good; on defense a negative change (allowing less) is good, and the rank reads that way. Backups can still play before the 25-point cutoff, so read a big dip next to the scores.',
+      cols: [
+        ['d_epa', 'Change', S2, 'd_rank'],
+        ['h1_epa', '1st half EPA', S2, null],
+        ['h2_epa', '2nd half EPA', S2, null],
+        ['h1_sr', '1st half success', P1, null],
+        ['h2_sr', '2nd half success', P1, null],
+        ['n2', '2nd half plays', N0, null]
       ] }
   ];
 
@@ -5363,7 +5568,7 @@
     document.getElementById('leagueTitle').textContent = v.label;
     document.getElementById('leagueLede').textContent = v.lede;
     document.getElementById('leagueEyebrow').textContent = state.season + ' season';
-    if (!vstate.leagueSort) { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || (v.id === 'adjusted' && vstate.leagueSide === 1)); }
+    if (!vstate.leagueSort) { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || ((v.id === 'adjusted' || v.id === 'halves') && vstate.leagueSide === 1)); }
 
     var key = v.id + '|' + state.season + '|' + (v.sided ? side : '');
     var tb = document.getElementById('leagueTable');
@@ -5418,10 +5623,10 @@
           cell: function (r, i) {
             return h('td', 'rk', rankKey && r[rankKey] ? String(r[rankKey]) : String(i + 1));
           } },
-        { head: 'School', key: 'team', num: false, cell: function (r) {
+        { head: v.who || 'School', key: 'team', num: false, cell: function (r) {
             var td = h('td', 'tm');
             var b = h('button', null, r.team);
-            b.onclick = function () { pickTeam(r.team); };
+            b.onclick = function () { pickTeam(v.teamKey ? r[v.teamKey] : r.team); };
             td.appendChild(b); return td;
           } },
         { head: 'Conference', key: 'conference', num: false,
@@ -5444,7 +5649,7 @@
         host: tb, cols: cols, rows: rows, sortKey: vstate.leagueSort, asc: vstate.leagueAsc,
         rowClass: function (r) { return r.team === state.team ? 'me' : ''; },
         onSort: function (kk, isNum) {
-          if (kk === '_pos') { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || (v.id === 'adjusted' && vstate.leagueSide === 1)); buildLeague(); return; }
+          if (kk === '_pos') { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || ((v.id === 'adjusted' || v.id === 'halves') && vstate.leagueSide === 1)); buildLeague(); return; }
           if (vstate.leagueSort === kk) vstate.leagueAsc = !vstate.leagueAsc;
           else { vstate.leagueSort = kk; vstate.leagueAsc = !isNum || (v.id === 'pace' && kk.indexOf('sec_') === 0); }
           buildLeague();
@@ -5452,7 +5657,7 @@
       });
       document.getElementById('leagueCount').textContent =
         rows.length + ' of ' + (all.length - dropped) + ' teams';
-      note.innerHTML = v.id === 'pace'
+      note.innerHTML = v.note ? v.note : v.id === 'pace'
         ? 'Lower seconds per snap is faster. The clock is not recorded on every play, so a team needs at least 60 timed snaps to appear here &mdash; <b>'
           + dropped + '</b> ' + (dropped === 1 ? 'team is' : 'teams are') + ' held back this season for a thin sample rather than being ranked off a handful of gaps.'
         : v.id === 'sos'
