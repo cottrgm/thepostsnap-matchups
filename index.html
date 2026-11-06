@@ -440,8 +440,8 @@ function render(){
     const T = D.teams[t], n = T.w + T.l, r = T.ratings || {};
     const rk = key => { const v = r[key]; if (v == null) return '–'; const all = TEAMS.map(x => (D.teams[x].ratings || {})[key]).filter(x => x != null); return `#${1 + all.filter(x => x > v).length}`; };
     const pr_ = v => v ? `#${v}` : 'NR';
-    const games = T.g.slice().sort((x, y) => x[0] - y[0]).map(x => `<span class="g ${x[3] > x[4] ? 'w' : 'l'}" title="Week ${x[0]}">${x[3] > x[4] ? 'W' : 'L'} ${x[3]}-${x[4]} ${x[2] === 'A' ? '@' : x[2] === 'N' ? 'vs' : ''} ${esc(x[1])}</span>`).join('');
-    $(el).innerHTML = `<h2 style="color:var(--${cls})">${esc(t)} so far</h2>
+    const games = T.g.slice().sort((x, y) => x[0] - y[0]).map(x => `<span class="g ${x[3] > x[4] ? 'w' : 'l'}" title="Week ${x[0]}">${x[3] > x[4] ? 'W' : 'L'} ${x[3]}-${x[4]} ${x[2] === 'A' ? '@' : x[2] === 'N' ? 'vs' : ''} <span>${esc(x[1])}</span></span>`).join('');
+    $(el).innerHTML = `<h2 style="color:var(--${cls})"><span>${esc(t)}</span> so far</h2>
       <div class="kv"><div><span class="lbl">Record</span><span class="v">${T.w}-${T.l}</span></div><div><span class="lbl">Points / game</span><span class="v">${n ? (T.pf/n).toFixed(1) : '–'}</span></div><div><span class="lbl">Allowed / game</span><span class="v">${n ? (T.pa/n).toFixed(1) : '–'}</span></div>
       <div><span class="lbl">CFP ranking</span><span class="v">${pr_(T.polls.cfp)}</span></div><div><span class="lbl">AP</span><span class="v">${pr_(T.polls.ap)}</span></div><div><span class="lbl">Coaches</span><span class="v">${pr_(T.polls.coaches)}</span></div>
       <div><span class="lbl">SP+ rank</span><span class="v">${rk('sp')}</span><span class="note">rating ${fmt(r.sp)}</span></div><div><span class="lbl">FPI rank</span><span class="v">${rk('fpi')}</span><span class="note">rating ${fmt(r.fpi)}</span></div><div><span class="lbl">Elo rank</span><span class="v">${rk('elo')}</span><span class="note">rating ${fmt(r.elo, 0)}</span></div></div>
@@ -468,7 +468,7 @@ function unitPanel(el, off, def, co, cd){
     const edge = d == null ? '' : Math.abs(d) < 3 ? `<span class="edge ee">even</span>` : `<span class="edge e${d > 0 ? co : cd}">${esc(d > 0 ? off : def)} +${Math.abs(d).toFixed(1)}</span>`;
     return `<div class="vs"><button class="tap va" data-k="${esc(ka)}" type="button">${fmt(a)}</button><div class="meter l"><i style="width:${w(a)}%;background:var(--${co})"></i></div><div class="grp">${esc(lab)}<br>${edge}</div><div class="meter"><i style="width:${w(b)}%;background:var(--${cd})"></i></div><button class="tap vb" data-k="${esc(kb)}" type="button">${fmt(b)}</button></div>`;
   }).join('');
-  $(el).innerHTML = `<h3><span style="color:var(--${co})">${esc(off)} offense</span> vs <span style="color:var(--${cd})">${esc(def)} defense</span></h3>${html}
+  $(el).innerHTML = `<h3><span style="color:var(--${co})"><span>${esc(off)}</span> offense</span> vs <span style="color:var(--${cd})"><span>${esc(def)}</span> defense</span></h3>${html}
     <p class="note" style="margin:8px 0 0">${S.svc === 'ALL' ? 'All Services' : esc(S.svc)} percentile, 0–100, top ${t} on each side, unrated ${S.unr === 'floor' ? 'scored as 0' : 'left out'}. Tap a number for the players.</p>`;
 }
 
