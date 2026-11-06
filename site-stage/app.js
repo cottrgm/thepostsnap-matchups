@@ -3993,7 +3993,6 @@
       url: function (side) { return 'api/x/adj_league?season=' + state.season + '&side=' + side; },
       lede: 'Every offense and defense re-rated against an average FBS schedule: credit for facing good units, a discount for padding stats against weak ones. #1 is best on either side of the ball.',
       cols: [
-        ['rank', 'Rank', N0, null],
         ['epa', 'EPA/play', S2, 'rank'],
         ['sr', 'Success', P1, 'sr_rank'],
         ['expl', 'Explosive', P1, 'expl_rank'],
@@ -4020,7 +4019,7 @@
     document.getElementById('leagueTitle').textContent = v.label;
     document.getElementById('leagueLede').textContent = v.lede;
     document.getElementById('leagueEyebrow').textContent = state.season + ' season';
-    if (!vstate.leagueSort) { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || v.id === 'adjusted'); }
+    if (!vstate.leagueSort) { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || (v.id === 'adjusted' && vstate.leagueSide === 1)); }
 
     var key = v.id + '|' + state.season + '|' + (v.sided ? side : '');
     var tb = document.getElementById('leagueTable');
@@ -4101,7 +4100,7 @@
         host: tb, cols: cols, rows: rows, sortKey: vstate.leagueSort, asc: vstate.leagueAsc,
         rowClass: function (r) { return r.team === state.team ? 'me' : ''; },
         onSort: function (kk, isNum) {
-          if (kk === '_pos') { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || v.id === 'adjusted'); buildLeague(); return; }
+          if (kk === '_pos') { vstate.leagueSort = v.cols[0][0]; vstate.leagueAsc = (v.id === 'pace' || (v.id === 'adjusted' && vstate.leagueSide === 1)); buildLeague(); return; }
           if (vstate.leagueSort === kk) vstate.leagueAsc = !vstate.leagueAsc;
           else { vstate.leagueSort = kk; vstate.leagueAsc = !isNum || (v.id === 'pace' && kk.indexOf('sec_') === 0); }
           buildLeague();
