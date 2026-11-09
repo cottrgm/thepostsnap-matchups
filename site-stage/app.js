@@ -227,7 +227,7 @@
     { id: 'overview', label: 'Overview', nums: ['01', '31', '21', '20', '30', '02', '03', '07', '16'] },
     { id: 'playcalling', label: 'Playcalling', nums: ['12', '13', '23', '24', '29', '06'] },
     { id: 'field', label: 'On the field', nums: ['14', '05'] },
-    { id: 'units', label: 'Players & units', nums: ['15', '22', '27', '28', '17', '08'] },
+    { id: 'units', label: 'Players & units', nums: ['15', '32', '22', '27', '28', '17', '08'] },
     { id: 'matchups', label: 'Matchups', nums: ['19'] },
     { id: 'compare', label: 'Compare', nums: ['25', '26', '09', '18', '11', '10', '04'] }
   ];
@@ -266,7 +266,7 @@
   function muQueue() { if (muQueued) return; muQueued = true; setTimeout(function () { muQueued = false; muView(); }, 60); }
   window.addEventListener('scroll', muQueue, { passive: true });
   window.addEventListener('resize', muQueue);
-  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); }, '31': function () { buildReview(); } };
+  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); }, '31': function () { buildReview(); }, '32': function () { buildHighs(); } };
   state.teamTab = state.teamTab || 'overview'; state.gSide = state.gSide || 0;
   state.liveKey = 0; state.liveDone = {};
 
@@ -4525,6 +4525,53 @@
     });
     var box = h('div', 'histchart'); box.appendChild(svg); host.appendChild(box);
     host.appendChild(h('p', 'tblnote', 'Each dot groups games by how sure the model was of its favorite (across) and shows how often that favorite won (up; bigger dots are more games). On the dashed line, the model\'s percentages mean what they say; above it the model was too timid, below it too confident. Same honest test as above: each week predicted only from earlier games.'));
+  }
+
+  /* ---- team page: season highs allowed, by position (conference view) ---- */
+  function buildHighs() {
+    var host = document.getElementById('highsBody'); if (!host) return;
+    var team = state.team; p5Loading(host);
+    xGet('highs', { team: team, season: state.season }).then(function (j) {
+      if (team !== state.team) return;
+      host.innerHTML = '';
+      if (!j || !j.rows) { host.appendChild(h('p', 'ax', 'No FBS games for ' + team + ' yet this season.')); return; }
+      var me = j.rows.filter(function (r) { return r.team === team; })[0] || { total: 0 };
+      p5Cards(host, [['Season highs allowed', num(me.total, me.total % 1 ? 1 : 0), 'opposing players who had their best game of the season against ' + team],
+        ['Nationally', j.rank ? '#' + j.rank.rk + ' of ' + j.rank.pool : '–', '#1 = gave up the most season highs'],
+        ['By position', 'QB ' + num(me.qb || 0, me.qb % 1 ? 1 : 0) + ' · RB ' + num(me.rb || 0, me.rb % 1 ? 1 : 0) + ' · WR/TE ' + num(me.wr || 0, me.wr % 1 ? 1 : 0), 'lead passer, lead rusher, top three receivers']]);
+      var key = h('p', 'hikey');
+      [['q', 'Quarterback'], ['r', 'Running back'], ['w', 'Receivers'], ['t', 'Tied (a share)']].forEach(function (k) { var s = h('span'); s.appendChild(h('i', 'hidot ' + k[0])); s.appendChild(document.createTextNode(k[1])); key.appendChild(s); });
+      host.appendChild(h('h3', 'fdh', (j.conference || 'Conference') + ' defenses'));
+      host.appendChild(key);
+      var X = tbl(['Defense', 'Season highs allowed', 'Total']);
+      j.rows.forEach(function (r) {
+        var tr = h('tr', 'clickable' + (r.team === team ? ' hime' : '')); tr.appendChild(td('pclab', r.team));
+        var dots = h('td', 'hidots');
+        [['qb', 'q'], ['rb', 'r'], ['wr', 'w']].forEach(function (g) {
+          var v = +r[g[0]] || 0, whole = Math.floor(v + 1e-9);
+          for (var i = 0; i < whole; i++) dots.appendChild(h('i', 'hidot ' + g[1]));
+          if (v - whole > 0.01) { var t = h('i', 'hidot t'); t.title = 'A tie for his best game: counts ' + num(v - whole, 2); dots.appendChild(t); }
+        });
+        tr.appendChild(dots); tr.appendChild(td('nd', num(+r.total, r.total % 1 ? 1 : 0)));
+        tr.onclick = function () { if (r.team !== team) pickTeam(r.team); };
+        X.tb.appendChild(tr);
+      });
+      host.appendChild(X.wrap);
+      var P = j.players || [];
+      if (P.length) {
+        host.appendChild(h('h3', 'fdh', 'Who did it against ' + team));
+        var Y = tbl(['Wk', 'Player', 'Team', 'Role', 'Yards']);
+        var role = { QB: 'Lead passer', RB: 'Lead rusher', WR: 'Top-3 receiver' };
+        P.forEach(function (x) {
+          var tr = h('tr', 'clickable'); tr.appendChild(td('nd', x.week)); tr.appendChild(td('pclab', x.player + (x.share < 1 ? ' (tied best)' : '')));
+          tr.appendChild(td(null, x.team)); tr.appendChild(td(null, role[x.grp] || x.grp)); tr.appendChild(td('nd', Math.round(x.yds)));
+          tr.onclick = function () { vstate.boxGame = x.game; setView('box'); };
+          Y.tb.appendChild(tr);
+        });
+        host.appendChild(Y.wrap);
+      }
+      host.appendChild(h('p', 'tblnote', 'For every FBS team: its lead passer (QB), lead rusher (RB) and top three receivers, by season yards, with at least four games against FBS opponents. Each player\'s best yardage game of the season is credited to the defense he did it against; a game tied for his best counts a share (open dot). FBS opponents only. Play-by-play box scores from CollegeFootballData, updated after every game day.'));
+    }).catch(function (e) { p5Fail(host, e); });
   }
 
   /* =====================================================================
