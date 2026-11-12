@@ -225,7 +225,7 @@
      their tab is open. The address bar always holds the current view, so a link reopens it. */
   var TEAM_TABS = [
     { id: 'overview', label: 'Overview', nums: ['01', '31', '21', '20', '30', '02', '03', '07', '16'] },
-    { id: 'playcalling', label: 'Playcalling', nums: ['12', '13', '23', '24', '29', '06'] },
+    { id: 'playcalling', label: 'Playcalling', nums: ['12', '33', '13', '23', '24', '29', '06'] },
     { id: 'field', label: 'On the field', nums: ['14', '05'] },
     { id: 'units', label: 'Players & units', nums: ['15', '32', '22', '27', '28', '17', '08'] },
     { id: 'matchups', label: 'Matchups', nums: ['19'] },
@@ -266,7 +266,7 @@
   function muQueue() { if (muQueued) return; muQueued = true; setTimeout(function () { muQueued = false; muView(); }, 60); }
   window.addEventListener('scroll', muQueue, { passive: true });
   window.addEventListener('resize', muQueue);
-  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); }, '31': function () { buildReview(); }, '32': function () { buildHighs(); } };
+  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); }, '31': function () { buildReview(); }, '32': function () { buildHighs(); }, '33': function () { buildPcGames(); } };
   state.teamTab = state.teamTab || 'overview'; state.gSide = state.gSide || 0;
   state.liveKey = 0; state.liveDone = {};
 
@@ -4574,6 +4574,63 @@
     }).catch(function (e) { p5Fail(host, e); });
   }
 
+  /* ---- team page: playcalling game by game ---- */
+  var PCG_COLS = [['plays', 'Plays', 'n'], ['pass_rate', 'Pass rate', 't'], ['ed_pass', 'Early-down pass', 't'], ['fd_pass', '1st & 10 pass', 't'],
+    ['td_pass', '3rd-down pass', 't'], ['rz_pass', 'Red-zone pass', 't'], ['shotgun', 'Shotgun', 't'], ['no_huddle', 'No-huddle', 't'],
+    ['deep_share', 'Deep share', 't'], ['epa', 'EPA/play', 'g'], ['sr', 'Success', 'g'], ['epa_pass', 'EPA/dropback', 'g'], ['epa_run', 'EPA/rush', 'g']];
+  function buildPcGames() {
+    var host = document.getElementById('pcgBody'); if (!host) return;
+    var team = state.team; state.pcgSide = state.pcgSide || 0;
+    host.innerHTML = '';
+    var ctl = h('div', 'segs'); host.appendChild(ctl);
+    segs(ctl, ['Offense', 'Defense'], state.pcgSide, function (i) { state.pcgSide = i; buildPcGames(); });
+    var body = h('div'); host.appendChild(body); p5Loading(body);
+    var side = state.pcgSide ? 'Defense' : 'Offense';
+    xGet('pc_games', { team: team, season: state.season, side: side }).then(function (j) {
+      if (team !== state.team) return;
+      body.innerHTML = '';
+      var G = j.games || [], F = j.fbs || {};
+      if (!G.length) { body.appendChild(h('p', 'ax', 'No FBS games for ' + team + ' yet this season.')); return; }
+      var X = tbl(['Wk', side === 'Offense' ? 'Opponent' : 'Offense faced'].concat(PCG_COLS.map(function (c) { return c[1]; })));
+      function cell(c, v, isTeam) {
+        if (v == null) return td('nd', '–');
+        if (c[2] === 'n') return td('nd', Math.round(v));
+        var f = c[2] === 't' || c[0] === 'sr' ? pct(+v, 0) : sgn(+v, 2), d = td('nd pcshade', f), base = F[c[0]];
+        if (base != null) {
+          var diff = +v - base;
+          if (c[2] === 't') {  /* how often: gray up/down marker, no good or bad */
+            if (Math.abs(diff) >= 0.05) { d.appendChild(h('small', 'pctend', diff > 0 ? ' ▲' : ' ▼')); d.title = 'FBS average ' + pct(base, 0); }
+          } else {  /* how well: blue = better for this side */
+            var better = side === 'Offense' ? diff : -diff, sc = c[0] === 'sr' ? 0.12 : 0.3;
+            d.style.background = shade(Math.max(0, Math.min(1, 0.5 + better / sc)));
+            d.title = 'FBS average ' + (c[0] === 'sr' ? pct(base, 0) : sgn(base, 2));
+          }
+        }
+        return d;
+      }
+      G.forEach(function (g) {
+        var tr = h('tr', 'clickable'); tr.appendChild(td('nd', g.week)); tr.appendChild(td('pclab', g.opp));
+        PCG_COLS.forEach(function (c) { tr.appendChild(cell(c, g[c[0]])); });
+        tr.onclick = function () { vstate.boxGame = g.game_id; setView('box'); };
+        X.tb.appendChild(tr);
+      });
+      if (j.season) {
+        var s = j.season, tr = h('tr', 'pctot'); tr.appendChild(td('nd', '')); tr.appendChild(td('pclab', 'Season (' + s.games + ' games)'));
+        PCG_COLS.forEach(function (c) {
+          var d = cell(c, s[c[0]], true), rk = s.ranks && s.ranks[c[0]];
+          if (rk) d.appendChild(h('small', 'pcrk', ' #' + rk + (c[2] === 't' ? ' most' : '')));
+          tr.appendChild(d);
+        });
+        X.tb.appendChild(tr);
+        var fr = h('tr', 'pcfbs'); fr.appendChild(td('nd', '')); fr.appendChild(td('pclab', 'FBS average'));
+        PCG_COLS.forEach(function (c) { var v = F[c[0]]; fr.appendChild(td('nd', v == null || c[2] === 'n' ? '–' : (c[2] === 't' || c[0] === 'sr' ? pct(+v, 0) : sgn(+v, 2)))); });
+        X.tb.appendChild(fr);
+      }
+      body.appendChild(X.wrap);
+      body.appendChild(h('p', 'tblnote', 'Runs, passes and sacks on downs one to four, every snap including garbage time (the same plays as the playcalling chart with no filters). Pass rate counts sacks as passes. Early downs are first and second; standard downs are the ones where a run is still on the table (first, second and 7 or less, third and fourth and 4 or less). The ▲/▼ marks a tendency at least 5 points above or below the FBS average; how often is not better or worse. EPA and success are shaded by how they compare with the FBS average, blue = better for this ' + side.toLowerCase() + '. Tap a game for its box score; the opponent filter on the playcalling chart shows the full chart for that game.'));
+    }).catch(function (e) { p5Fail(body, e); });
+  }
+
   /* =====================================================================
      Views. The team page is one thing; a weekly slate and league-wide
      tables are another shape entirely, so they get their own screens
@@ -5946,6 +6003,21 @@
         ['raw_rank', 'Raw rank', N0, null],
         ['move', 'Moved', N0, null]
       ] },
+    { id: 'playcalling', label: 'Playcalling', sided: true,
+      url: function (side) { return 'api/x/pc_league?season=' + state.season + '&side=' + side; },
+      lede: 'How every FBS team calls it: how often it throws overall, on early downs, on third down and in the red zone, how much shotgun and tempo, and how well it works.',
+      note: 'Runs, passes and sacks on downs one to four, every snap. Pass rate counts sacks as passes. Ranks on the tendency columns count from the most (#1 = throws the most, plays the most no-huddle); they are styles, not grades, so they are not shaded. EPA and success are shaded and rank best-first for the side shown. Tap a team for its game-by-game playcalling on its Playcalling tab.',
+      cols: [
+        ['pass_rate', 'Pass rate', P1, 'pass_rate_rank', 'style'],
+        ['ed_pass', 'Early-down pass', P1, 'ed_pass_rank', 'style'],
+        ['td_pass', '3rd-down pass', P1, 'td_pass_rank', 'style'],
+        ['rz_pass', 'Red-zone pass', P1, 'rz_pass_rank', 'style'],
+        ['shotgun', 'Shotgun', P1, 'shotgun_rank', 'style'],
+        ['no_huddle', 'No-huddle', P1, 'no_huddle_rank', 'style'],
+        ['epa', 'EPA/play', S2, 'epa_rank'],
+        ['sr', 'Success', P1, 'sr_rank'],
+        ['plays', 'Plays', N0, null]
+      ] },
     { id: 'qbs', label: 'Quarterbacks', sided: false, who: 'Quarterback', teamKey: 'school',
       url: function () { return 'api/x/qb_rows?season=' + state.season; },
       lede: 'Every FBS quarterback with 100 or more dropbacks, ranked by EPA per dropback after adjusting for the pass defenses he faced.',
@@ -6058,7 +6130,8 @@
                      val === null || val === undefined ? '–' : c[2](val));
           if (c[3] && r[c[3]] && r.pool) {
             td.title = ord(r[c[3]]) + ' of ' + r.pool;
-            var bg = tint((r.pool - r[c[3]]) / Math.max(r.pool - 1, 1), false);
+            if (c[4] === 'style') td.title += ' (most first; a style, not a grade)';
+            var bg = c[4] === 'style' ? null : tint((r.pool - r[c[3]]) / Math.max(r.pool - 1, 1), false);
             if (bg) td.style.background = bg;
           }
           return td;

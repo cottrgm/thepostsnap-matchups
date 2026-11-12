@@ -1,0 +1,7 @@
+
+/* ---- playcalling game by game ---- */
+#pcgBody > .segs { margin: 6px 0 10px; }
+tr.pctot td { border-top: 2px solid var(--line); font-weight: 600; }
+tr.pcfbs td { color: var(--muted); font-style: italic; }
+.pctend { color: var(--muted); font-size: 10px; }
+.pcrk { color: var(--muted); font-size: 11px; font-weight: 500; white-space: nowrap; }
