@@ -4631,6 +4631,74 @@
     }).catch(function (e) { p5Fail(body, e); });
   }
 
+  /* ---- box score: drive by drive with every play and every flag ---- */
+  var DRV_RES = { TD: 'Touchdown', FG: 'Field goal', Punt: 'Punt', Interception: 'Interception', Fumble: 'Fumble lost', 'Missed FG': 'Missed field goal',
+    Downs: 'Turnover on downs', Safety: 'Safety', 'End of half': 'End of half', 'End of game': 'End of game', Kneel: 'Kneel', Unknown: 'Not in the play log' };
+  function drvClock(s) { if (s == null) return ''; s = Math.max(0, +s); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+  function drvSpot(ytg) { if (ytg == null) return ''; ytg = +ytg; return ytg === 50 ? 'the 50' : ytg > 50 ? 'own ' + (100 - ytg) : 'opp ' + ytg; }
+  function drvFlags(n, y) { return n ? n + (n === 1 ? ' flag, ' : ' flags, ') + y + ' yds' : ''; }
+  function boxDrivesNew(dt, gid, fallback) {
+    dt.innerHTML = '';
+    var cap = h('caption', 'ax', 'Loading drives…'); dt.appendChild(cap);
+    xGet('game_drives', { game: gid }).then(function (j) {
+      var D = (j && j.drives) || [];
+      dt.innerHTML = '';
+      if (!D.length) { fallback(); return; }
+      var head = ['#', 'Team', 'Qtr', 'Clock', 'Start', 'Plays', 'Yards', 'Flags on offense', 'Flags on defense', 'Result'];
+      var tr = h('tr'); head.forEach(function (x) { tr.appendChild(h('th', null, x)); });
+      var th = document.createElement('thead'); th.appendChild(tr); dt.appendChild(th);
+      var tb = document.createElement('tbody'); dt.appendChild(tb);
+      var pos = css('--pos'), neg = css('--neg');
+      D.forEach(function (d, i) {
+        var r = h('tr', 'clickable drvrow'); r.title = 'Tap for every play on this drive';
+        var yds = d.start != null && d.end != null ? d.start - d.end : null;
+        [String(i + 1), d.team, d.q > 4 ? 'OT' : 'Q' + d.q, drvClock(d.clock), drvSpot(d.start), String(d.plays), yds == null ? '' : String(yds),
+         drvFlags(d.o_pen, d.o_pen_yds), drvFlags(d.d_pen, d.d_pen_yds), DRV_RES[d.result] || d.result].forEach(function (v, ci) {
+          var c = h('td', ci === 0 ? 'rk' : ci === 9 ? 'drvres' : null, v);
+          if (ci === 9 && d.points > 0) c.style.color = pos;
+          if (ci === 9 && /Interception|Fumble|Downs|Safety/.test(d.result)) c.style.color = neg;
+          if (ci === 0) c.insertBefore(h('span', 'drvcaret', '▸ '), c.firstChild);
+          r.appendChild(c);
+        });
+        var open = null;
+        r.onclick = function () {
+          if (open) { open.remove(); open = null; r.classList.remove('open'); return; }
+          open = h('tr', 'drvplays'); var c = h('td'); c.colSpan = head.length; open.appendChild(c);
+          var t = document.createElement('table'); t.className = 'pbp';
+          var hr = h('tr'); ['Qtr', 'Clock', 'Down', 'Spot', 'Play', 'Yds', 'EPA'].forEach(function (x) { hr.appendChild(h('th', null, x)); });
+          var th2 = document.createElement('thead'); th2.appendChild(hr); t.appendChild(th2);
+          var b2 = document.createElement('tbody');
+          /* the feed sometimes files a snap late; show them in game-clock order */
+          (d.pbp || []).map(function (p, k) { return [p, k]; }).sort(function (x, y) {
+            return (x[0][0] - y[0][0]) || ((y[0][1] == null ? -1 : y[0][1]) - (x[0][1] == null ? -1 : x[0][1])) || (x[1] - y[1]);
+          }).map(function (x) { return x[0]; }).forEach(function (p) {
+            /* [period, clock, down, distance, ytg, yards, type, text, epa, pens, penalty row, scrimmage] */
+            var row = h('tr', p[10] ? 'pbppen' : !p[11] ? 'pbpst' : null);
+            row.appendChild(td('nd', p[0] > 4 ? 'OT' : 'Q' + p[0])); row.appendChild(td('nd', drvClock(p[1])));
+            row.appendChild(td('nd', p[2] ? p[2] + ' & ' + (p[4] != null && +p[3] >= +p[4] ? 'goal' : p[3]) : ''));
+            row.appendChild(td('nd', drvSpot(p[4])));
+            var pc = h('td', 'pbptxt'); pc.appendChild(h('span', 'pbptype', p[6]));
+            pc.appendChild(document.createTextNode(' ' + String(p[7] || '').replace(/^\(\d+:\d+\)\s*/, '')));
+            (p[9] || []).forEach(function (f) {
+              pc.appendChild(h('span', 'pbpflag ' + (f.st === 'accepted' ? 'acc' : 'dec'),
+                'Flag' + (f.who === 'O' ? ' on offense' : f.who === 'D' ? ' on defense' : '') + ': ' + (f.name || 'penalty') +
+                (f.st === 'accepted' ? (f.yds != null ? ', ' + f.yds + ' yds' : '') : ', ' + f.st)));
+            });
+            row.appendChild(pc);
+            row.appendChild(td('nd', p[11] && p[5] != null ? String(p[5]) : ''));
+            row.appendChild(td('nd', p[11] && p[8] != null ? sgn(+p[8], 2) : ''));
+            b2.appendChild(row);
+          });
+          t.appendChild(b2); c.appendChild(t);
+          r.parentNode.insertBefore(open, r.nextSibling); r.classList.add('open');
+        };
+        tb.appendChild(r);
+      });
+      var note = h('caption', 'tblnote drvnote', 'Tap a drive for every play on it, flags included. Start is where the first snap was; yards run from there to where the last snap ended, so penalty yards count. Plays and the EPA column are snaps only; gray rows are kicks and flagged rows are penalties that wiped out the play or were called on their own. A drive the play log cuts off before it ends shows as “Not in the play log.”');
+      note.style.captionSide = 'bottom'; dt.appendChild(note);
+    }).catch(function () { dt.innerHTML = ''; fallback(); });
+  }
+
   /* =====================================================================
      Views. The team page is one thing; a weekly slate and league-wide
      tables are another shape entirely, so they get their own screens
@@ -5873,8 +5941,11 @@
 
     /* drive chart */
     var dt = document.getElementById('boxDrives');
-    dt.innerHTML = '';
+    var gidD = (j.game && j.game.game_id) || vstate.boxGame;
+    var keepD = gidD && dt.dataset.gid === String(gidD) && dt.rows.length;
+    if (!keepD) dt.innerHTML = '';
     var drives = j.drives || [];
+    var oldDrives = function () {
     if (drives.length) {
       var head = ['#', 'Team', 'Qtr', 'Started', 'Snaps', 'Result'];
       var tr = h('tr'); head.forEach(function (x) { tr.appendChild(h('th', null, x)); });
@@ -5897,6 +5968,8 @@
       });
       dt.appendChild(tbody);
     }
+    };
+    if (!keepD) { dt.dataset.gid = gidD || ''; if (gidD) boxDrivesNew(dt, gidD, oldDrives); else oldDrives(); }
 
     /* player box */
     var teams = [away ? away.team : g.away_team, home ? home.team : g.home_team];
