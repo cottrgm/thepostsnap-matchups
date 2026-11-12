@@ -4633,7 +4633,8 @@
 
   /* ---- box score: drive by drive with every play and every flag ---- */
   var DRV_RES = { TD: 'Touchdown', FG: 'Field goal', Punt: 'Punt', Interception: 'Interception', Fumble: 'Fumble lost', 'Missed FG': 'Missed field goal',
-    Downs: 'Turnover on downs', Safety: 'Safety', 'End of half': 'End of half', 'End of game': 'End of game', Kneel: 'Kneel', Unknown: 'Not in the play log' };
+    Downs: 'Turnover on downs', Safety: 'Safety', 'End of half': 'End of half', 'End of game': 'End of game', Kneel: 'Kneel', Unknown: 'Not in the play log',
+    'Punt (inferred)': 'Punt*', 'Turnover (inferred)': 'Turnover*' };
   function drvClock(s) { if (s == null) return ''; s = Math.max(0, +s); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
   function drvSpot(ytg) { if (ytg == null) return ''; ytg = +ytg; return ytg === 50 ? 'the 50' : ytg > 50 ? 'own ' + (100 - ytg) : 'opp ' + ytg; }
   function drvFlags(n, y) { return n ? n + (n === 1 ? ' flag, ' : ' flags, ') + y + ' yds' : ''; }
@@ -4653,10 +4654,11 @@
         var r = h('tr', 'clickable drvrow'); r.title = 'Tap for every play on this drive';
         var yds = d.start != null && d.end != null ? d.start - d.end : null;
         [String(i + 1), d.team, d.q > 4 ? 'OT' : 'Q' + d.q, drvClock(d.clock), drvSpot(d.start), String(d.plays), yds == null ? '' : String(yds),
-         drvFlags(d.o_pen, d.o_pen_yds), drvFlags(d.d_pen, d.d_pen_yds), DRV_RES[d.result] || d.result].forEach(function (v, ci) {
+         drvFlags(d.o_pen, d.o_pen_yds), drvFlags(d.d_pen, d.d_pen_yds), (DRV_RES[d.result] || d.result) + (d.net != null ? ' · net ' + d.net : '')].forEach(function (v, ci) {
           var c = h('td', ci === 0 ? 'rk' : ci === 9 ? 'drvres' : null, v);
           if (ci === 9 && d.points > 0) c.style.color = pos;
-          if (ci === 9 && /Interception|Fumble|Downs|Safety/.test(d.result)) c.style.color = neg;
+          if (ci === 9 && /Interception|Fumble|Downs|Safety|Turnover/.test(d.result)) c.style.color = neg;
+          if (ci === 9 && /inferred/.test(d.result)) c.title = 'The play log stops before this drive ends. ' + (/Punt/.test(d.result) ? 'The other team took over ' + d.net + ' yards down the field, so it was a punt.' : 'The other team took over about where the ball was, so it was a turnover (on downs, a fumble or an interception).');
           if (ci === 0) c.insertBefore(h('span', 'drvcaret', '▸ '), c.firstChild);
           r.appendChild(c);
         });
@@ -4694,7 +4696,7 @@
         };
         tb.appendChild(r);
       });
-      var note = h('caption', 'tblnote drvnote', 'Tap a drive for every play on it, flags included. Start is where the first snap was; yards run from there to where the last snap ended, so penalty yards count. Plays and the EPA column are snaps only; gray rows are kicks and flagged rows are penalties that wiped out the play or were called on their own. A drive the play log cuts off before it ends shows as “Not in the play log.”');
+      var note = h('caption', 'tblnote drvnote', 'Tap a drive for every play on it, flags included. Start is where the first snap was; yards run from there to where the last snap ended, so penalty yards count. Plays and the EPA column are snaps only; gray rows are kicks and flagged rows are penalties that wiped out the play or were called on their own. Net on a punt runs from the line of scrimmage to where the other team took over. * = the play log stops before the drive ends, so the result is read from where the other team took over: well down the field means a punt, about where the ball was means a turnover. A drive with no clue either way shows as “Not in the play log.”');
       note.style.captionSide = 'bottom'; dt.appendChild(note);
     }).catch(function () { dt.innerHTML = ''; fallback(); });
   }
