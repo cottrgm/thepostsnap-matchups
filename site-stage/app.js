@@ -4645,7 +4645,7 @@
       var D = (j && j.drives) || [];
       dt.innerHTML = '';
       if (!D.length) { fallback(); return; }
-      var head = ['#', 'Team', 'Qtr', 'Clock', 'Start', 'Plays', 'Yards', 'Flags on offense', 'Flags on defense', 'Result'];
+      var head = ['#', 'Team', 'Began', 'Ended', 'Time', 'Start', 'Plays', 'Yards', 'Flags on offense', 'Flags on defense', 'Result'];
       var tr = h('tr'); head.forEach(function (x) { tr.appendChild(h('th', null, x)); });
       var th = document.createElement('thead'); th.appendChild(tr); dt.appendChild(th);
       var tb = document.createElement('tbody'); dt.appendChild(tb);
@@ -4653,12 +4653,18 @@
       D.forEach(function (d, i) {
         var r = h('tr', 'clickable drvrow'); r.title = 'Tap for every play on this drive';
         var yds = d.start != null && d.end != null ? d.start - d.end : null;
-        [String(i + 1), d.team, d.q > 4 ? 'OT' : 'Q' + d.q, drvClock(d.clock), drvSpot(d.start), String(d.plays), yds == null ? '' : String(yds),
+        /* the drive ends when the next one begins (same half); the last drive of a half runs out the quarter */
+        var half = function (q) { return q <= 2 ? 1 : q <= 4 ? 2 : q; }, nx = D[i + 1], eq, ec;
+        if (nx && half(nx.q) === half(d.end_q || d.q)) { eq = nx.q; ec = nx.clock; } else { eq = d.end_q || d.q; ec = eq > 4 ? d.clock_end : 0; }
+        var qn = function (q) { return q > 4 ? 'OT' : 'Q' + q; };
+        var el = d.clock == null || ec == null ? null : (Math.min(eq, 4) - Math.min(d.q, 4)) * 900 + (+d.clock) - (+ec);
+        [String(i + 1), d.team, qn(d.q) + ' ' + drvClock(d.clock), qn(eq) + ' ' + drvClock(ec), el == null || el < 0 || d.q > 4 ? '' : drvClock(el),
+         drvSpot(d.start), String(d.plays), yds == null ? '' : String(yds),
          drvFlags(d.o_pen, d.o_pen_yds), drvFlags(d.d_pen, d.d_pen_yds), (DRV_RES[d.result] || d.result) + (d.net != null ? ' · net ' + d.net : '')].forEach(function (v, ci) {
-          var c = h('td', ci === 0 ? 'rk' : ci === 9 ? 'drvres' : null, v);
-          if (ci === 9 && d.points > 0) c.style.color = pos;
-          if (ci === 9 && /Interception|Fumble|Downs|Safety|Turnover/.test(d.result)) c.style.color = neg;
-          if (ci === 9 && /inferred/.test(d.result)) c.title = 'The play log stops before this drive ends. ' + (/Punt/.test(d.result) ? 'The other team took over ' + d.net + ' yards down the field, so it was a punt.' : 'The other team took over about where the ball was, so it was a turnover (on downs, a fumble or an interception).');
+          var c = h('td', ci === 0 ? 'rk' : ci === 10 ? 'drvres' : null, v);
+          if (ci === 10 && d.points > 0) c.style.color = pos;
+          if (ci === 10 && /Interception|Fumble|Downs|Safety|Turnover/.test(d.result)) c.style.color = neg;
+          if (ci === 10 && /inferred/.test(d.result)) c.title = 'The play log stops before this drive ends. ' + (/Punt/.test(d.result) ? 'The other team took over ' + d.net + ' yards down the field, so it was a punt.' : 'The other team took over about where the ball was, so it was a turnover (on downs, a fumble or an interception).');
           if (ci === 0) c.insertBefore(h('span', 'drvcaret', '▸ '), c.firstChild);
           r.appendChild(c);
         });
@@ -4696,7 +4702,7 @@
         };
         tb.appendChild(r);
       });
-      var note = h('caption', 'tblnote drvnote', 'Tap a drive for every play on it, flags included. Start is where the first snap was; yards run from there to where the last snap ended, so penalty yards count. Plays and the EPA column are snaps only; gray rows are kicks and flagged rows are penalties that wiped out the play or were called on their own. Net on a punt runs from the line of scrimmage to where the other team took over. * = the play log stops before the drive ends, so the result is read from where the other team took over: well down the field means a punt, about where the ball was means a turnover. A drive with no clue either way shows as “Not in the play log.”');
+      var note = h('caption', 'tblnote drvnote', 'Tap a drive for every play on it, flags included. Began and ended are the game clock; a drive ends when the next one begins, and the last drive of a half runs to the end of the quarter, so time is how long the drive held the ball (two-minute drills and kneels included). Start is where the first snap was; yards run from there to where the last snap ended, so penalty yards count. Plays and the EPA column are snaps only; gray rows are kicks and flagged rows are penalties that wiped out the play or were called on their own. Net on a punt runs from the line of scrimmage to where the other team took over. * = the play log stops before the drive ends, so the result is read from where the other team took over: well down the field means a punt, about where the ball was means a turnover. A drive with no clue either way shows as “Not in the play log.”');
       note.style.captionSide = 'bottom'; dt.appendChild(note);
     }).catch(function () { dt.innerHTML = ''; fallback(); });
   }
