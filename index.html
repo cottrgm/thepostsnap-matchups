@@ -117,7 +117,7 @@ dialog::backdrop{background:rgba(10,14,22,.5)}
 .badge{font:600 10px var(--body);border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:1px}
 .bt{background:color-mix(in srgb,var(--gold) 20%,transparent);color:var(--gold)}
 .bf{background:var(--soft);color:var(--muted)}
-.basisT{color:var(--gold)} .basisU{color:var(--muted)}
+.basisT{color:var(--gold)} .basisU{color:var(--muted)} .cnted{font-size:.8em;color:var(--muted);white-space:nowrap} td.rtg{color:var(--muted)}
 .dl{font:500 11px var(--mono);margin-left:4px}.dl.up{color:var(--good)}.dl.dn{color:var(--b)}
 .bc{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
 .bl{background:var(--b-soft);color:var(--b)}
@@ -505,19 +505,19 @@ function unitPanel(el, off, def, co, cd){
 function table(){
   const side = S.tblSide, t = S.tier, k = side + t;
   const head = `<thead><tr><th rowspan="2" class="svch">Service</th><th colspan="4" class="tmh" style="color:var(--a)">${esc(S.A)}</th><th colspan="4" class="tmh tsep" style="color:var(--b)">${esc(S.B)}</th></tr>
-    <tr><th>Avg</th><th class="cnt" title="High-school recruits this service rates">HS</th><th class="cnt" title="Every transfer in the group, whatever rating scores him">Portal</th><th class="cnt" title="High-school recruits this service does not rate">Unrated</th><th class="tsep">Avg</th><th class="cnt" title="High-school recruits this service rates">HS</th><th class="cnt" title="Every transfer in the group, whatever rating scores him">Portal</th><th class="cnt" title="High-school recruits this service does not rate">Unrated</th></tr></thead>`;
+    <tr><th title="Average percentile, 0-100: the same scale on every row, so rows can be compared">Pct</th><th title="Average rating points on the service's own scale (Rivals converted to 100-point)">Rating</th><th class="cnt" title="High-school recruits this service rates">HS</th><th class="cnt" title="Every transfer in the group, whatever rating scores him">Portal</th><th class="cnt" title="High-school recruits this service does not rate">Unrated</th><th class="tsep" title="Average percentile, 0-100">Pct</th><th title="Average rating points on the service's own scale">Rating</th><th class="cnt" title="High-school recruits this service rates">HS</th><th class="cnt" title="Every transfer in the group, whatever rating scores him">Portal</th><th class="cnt" title="High-school recruits this service does not rate">Unrated</th></tr></thead>`;
   const cells = (team, svc, sep) => {
-    const v = talentVal(team, side, t, svc), grp = inTier(team, side, t), r = [0, 0, 0, 0, 0, 0, 0];
+    const v = pctVal(team, side, t, svc), rv = svc === 'ALL' ? null : talentVal(team, side, t, svc), grp = inTier(team, side, t), r = [0, 0, 0, 0, 0, 0, 0];
     grp.forEach(p => { const b = bucket(p, svc); r[b === 'H' ? 4 : b === 'T' ? 5 : 6]++; });
-    const base = `${team}|${side}|${svc}`, dp = svc === 'Rivals' ? 2 : 1;
+    const base = `${team}|${side}|${svc}`, dp = 1;
     let dl = '';
-    if (S.yr === 2027){ const r0 = D.talent[team][k][svc], v0 = svc === 'ALL' ? r0[S.unr === 'floor' ? 3 : 2] : r0[S.unr === 'floor' ? 1 : 0];
+    if (S.yr === 2027){ const r0 = D.talent[team][k][svc], v0 = r0[S.unr === 'floor' ? 3 : 2];
       if (v != null && v0 != null) { const d = v - v0; dl = `<span class="dl ${d > 0.05 ? 'up' : d < -0.05 ? 'dn' : ''}">${sgn(d, dp)}</span>`; } }
     return `<td class="${sep ? 'tsep' : ''}"><button class="tap" type="button" data-k="svc|${esc(base)}">${fmt(v, dp)}</button>${dl}</td>
-      <td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|H">${r[4]}</button></td><td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|T">${r[5]}</button></td><td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|U">${r[6]}</button></td>`;
+      <td class="rtg">${svc === 'ALL' ? '<span class="basisU">–</span>' : fmt(rv, 1)}</td><td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|H">${r[4]}</button></td><td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|T">${r[5]}</button></td><td class="cnt"><button class="tap" type="button" data-k="basis|${esc(base)}|U">${r[6]}</button></td>`;
   };
-  const rows = ['ALL', ...SV].map(s => `<tr class="${s === 'ALL' ? 'all' : ''}"><td>${s === 'ALL' ? 'All Services (pct)' : esc(s)}</td>${cells(S.A, s, false)}${cells(S.B, s, true)}</tr>`).join('');
-  $('tbl').innerHTML = `<div class="tblwrap"><table class="svct">${head}<tbody>${rows}</tbody></table></div><p class="note">${S.yr === 2027 ? 'Projected 2027 lineup; small number = change from 2026. ' : ''}Avg counts unrated players ${S.unr === 'floor' ? 'at the 2-star floor' : 'as excluded'}. HS = high-school recruits the service rates; Portal = every transfer in the group; Unrated = high-school recruits the service does not rate. A transfer with no high-school rating is scored on his portal rating, at a ${Math.round(D.discount*100)}% discount above the floor.</p>`;
+  const rows = ['ALL', ...SV].map(s => `<tr class="${s === 'ALL' ? 'all' : ''}"><td>${s === 'ALL' ? 'All Services' : esc(s)}</td>${cells(S.A, s, false)}${cells(S.B, s, true)}</tr>`).join('');
+  $('tbl').innerHTML = `<div class="tblwrap"><table class="svct">${head}<tbody>${rows}</tbody></table></div><p class="note">${S.yr === 2027 ? 'Projected 2027 lineup; small number = change from 2026. ' : ''}<b>Pct</b> = average percentile (0-100) among each service's high-school pool, the one scale every row shares. <b>All Services</b> averages each player's percentile across the services that rate him, then averages the players, so every player counts once: it is not the average of the six rows, because the services that rate only a few players here (often the best-known recruits) would otherwise count as much as the ones that rate everyone. <b>Rating</b> = average rating points on each service's own scale (ESPN runs lower than the others); Rivals' old 5.2-6.1 ratings are shown on the 100-point scale Rivals uses now (5.5 ≈ 85.7, 5.8 ≈ 90.0, 6.1 ≈ 97.0, from the same players' On3 ratings). Unrated players count ${S.unr === 'floor' ? 'at the 2-star floor (0 in Pct)' : 'as excluded'}. HS = high-school recruits the service rates; Portal = every transfer in the group; Unrated = high-school recruits the service does not rate. A transfer with no high-school rating is scored on his portal rating, at a ${Math.round(D.discount*100)}% discount above the floor; tap a number to see each player's rating and the value counted.</p>`;
 }
 
 function stars(n){ return n ? `<span class="stars">${'★'.repeat(n)}</span>` : ''; }
@@ -527,7 +527,7 @@ function playerRows(ps, svc, yr = S.yr){
   const body = ps.map(p => {
     const tag = p.st === 'T' ? `<span class="badge bt">TR from ${esc(p.from)}</span>` : p.st === 'NT' ? '<span class="badge bt">TR · JUCO/other</span>' : p.st === 'N' ? '<span class="badge bf">new</span>' : p.st === 'C' ? '<span class="badge bc">2027 commit</span>' : '';
     const nm = `${esc(p.name)}${tag}${p.leave === 'E' && yr === 2026 ? '<span class="badge bl">leaving · out of eligibility</span>' : p.leave === 'P' && yr === 2026 ? '<span class="badge bl">leaving · transfer portal</span>' : ''}${p.fill ? '<span class="badge bf">roster fill</span>' : ''}${p.out && yr === 2026 ? `<span class="badge bo">${esc(p.out)}</span>` : ''}`;
-    const rc = x => x[2] === 'U' ? '<span class="basisU">–</span>' : `<span class="${x[2] === 'T' ? 'basisT' : ''}">${x[0] == null ? '–' : (+x[0]).toFixed(x[0] < 10 ? 1 : (x[0] % 1 ? 1 : 0))}</span>`;
+    const rc = x => x[2] === 'U' ? '<span class="basisU">–</span>' : `<span class="${x[2] === 'T' ? 'basisT' : ''}"${x[5] != null ? ` title="Rivals ${(+x[5]).toFixed(1)} on its old scale"` : ''}>${x[0] == null ? '–' : (+x[0]).toFixed(x[0] % 1 ? 1 : 0)}${x[2] === 'T' && x[4] != null && Math.abs(x[4] - x[0]) > 0.05 ? `<span class="cnted"> → ${(+x[4]).toFixed(1)}</span>` : ''}${x[5] != null ? `<span class="cnted"> (${(+x[5]).toFixed(1)})</span>` : ''}</span>`;
     const cols = one >= 0
       ? (x => `<td>${rc(x)} ${stars(x[1])}</td><td>${x[2] === 'H' ? 'High school' : x[2] === 'T' ? '<span class="basisT">Portal only</span>' : '<span class="basisU">Unrated</span>'}</td><td>${fmt(x[3])}</td>`)(p.s[one])
       : p.s.map(rc).map(v => `<td>${v}</td>`).join('') + `<td><b>${fmt(p.all)}</b></td>`;
@@ -654,7 +654,7 @@ function classImpact(){
   const rkKey = cols[S.clsSort][2] || 'scRk';
   const confs = new Set([D.teams[S.A].conf, D.teams[S.B].conf]);
   const show = S.clsScope === 'all' ? rows : rows.filter(r => confs.has(r.conf));
-  const dp = S.svc === 'Rivals' ? 2 : 1;
+  const dp = 1;
   const th = (key, align) => { const on = S.clsSort === key; const arrow = on ? (dir > 0 ? ' ▲' : ' ▼') : '';
     return `<th style="${align ? 'text-align:left;' : ''}cursor:pointer;white-space:nowrap${on ? ';color:var(--ink)' : ''}" data-cls-sort="${key}" aria-sort="${on ? (dir > 0 ? 'ascending' : 'descending') : 'none'}">${cols[key][1]}${arrow}</th>`; };
   const rk = n => `<span class="note">#${n}</span>`;
