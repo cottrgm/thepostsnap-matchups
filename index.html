@@ -377,7 +377,7 @@ function bucket(p, s){
 }
 function inTier(team, side, tier, yr = S.yr){
   const ps = (byTeam[team] || []).filter(p => p.side === side);
-  return yr === 2027 ? ps.filter(p => p.r27 && p.r27 <= tier).sort((a,b) => a.r27 - b.r27) : ps.filter(p => p.st !== 'C' && p.rank <= tier);
+  return yr === 2027 ? ps.filter(p => p.r27 && p.r27 <= tier).sort((a,b) => a.r27 - b.r27) : ps.filter(p => p.st !== 'C' && p.st !== 'TC' && p.rank <= tier);
 }
 // players who would be in this top-N on season snaps but are out now (portal, dismissed, injured, not playing)
 function outList(team, side, tier){ return (byTeam[team] || []).filter(p => p.side === side && p.out && p.orank <= tier).sort((a, b) => a.orank - b.orank); }
@@ -537,7 +537,7 @@ function playerRows(ps, svc, yr = S.yr){
   const one = svc && svc !== 'ALL' ? SV.indexOf(svc) : -1;
   const hd = one >= 0 ? `<th>${esc(svc)}</th><th>Basis</th><th>Pct</th>` : `<th>247</th><th>Comp</th><th>On3</th><th>Ind</th><th>ESPN</th><th>Rivals</th><th title="Average of the percentiles shown under each rating, with its star equivalent">All pctl</th>`;
   const body = ps.map(p => {
-    const tag = p.st === 'T' ? `<span class="badge bt">TR from ${esc(p.from)}</span>` : p.st === 'NT' ? '<span class="badge bt">TR · JUCO/other</span>' : p.st === 'N' ? '<span class="badge bf">new</span>' : p.st === 'C' ? '<span class="badge bc">2027 commit</span>' : '';
+    const tag = p.st === 'T' ? `<span class="badge bt">TR from ${esc(p.from)}</span>` : p.st === 'NT' ? '<span class="badge bt">TR · JUCO/other</span>' : p.st === 'N' ? '<span class="badge bf">new</span>' : p.st === 'C' ? '<span class="badge bc">2027 commit</span>' : p.st === 'TC' ? `<span class="badge bt">2027 transfer${p.from ? ' from ' + esc(p.from) : ''}</span>` : '';
     const nm = `${esc(p.name)}${tag}${p.leave === 'E' && yr === 2026 ? '<span class="badge bl">leaving · out of eligibility</span>' : p.leave === 'P' && yr === 2026 ? '<span class="badge bl">leaving · transfer portal</span>' : ''}${p.fill ? '<span class="badge bf">roster fill</span>' : ''}${p.out && yr === 2026 ? `<span class="badge bo">${esc(p.out)}</span>` : ''}`;
     const rc = x => x[2] === 'U' ? '<span class="basisU">–</span>' : `<span class="${x[2] === 'T' ? 'basisT' : ''}"${x[5] != null ? ` title="Rivals ${(+x[5]).toFixed(1)} on its old scale"` : ''}>${x[0] == null ? '–' : (+x[0]).toFixed(x[0] % 1 ? 1 : 0)}${x[2] === 'T' && x[4] != null && Math.abs(x[4] - x[0]) > 0.05 ? `<span class="cnted"> → ${(+x[4]).toFixed(1)}</span>` : ''}${x[5] != null ? `<span class="cnted"> (${(+x[5]).toFixed(1)})</span>` : ''}</span>${x[3] != null ? `<div class="pctl">${ordn(x[3])} pctl</div>` : ''}`;
     const cols = one >= 0
@@ -569,8 +569,8 @@ function turnLists(team, side, t){
     out,
     leave: all.filter(p => p.leave),
     leaveE: all.filter(p => p.leave === 'E'), leaveP: all.filter(p => p.leave === 'P'),
-    arrive: next.filter(p => p.st === 'C'),
-    ret: next.filter(p => p.st !== 'C'),
+    arrive: next.filter(p => p.st === 'C' || p.st === 'TC'),
+    ret: next.filter(p => p.st !== 'C' && p.st !== 'TC'),
     tin: now.filter(p => p.st === 'T' || p.st === 'NT'),
     lost: P.filter(p => p.from === team && p.side === side && p.st === 'T'),
     fresh: now.filter(p => /^FR/.test(p.cls || '')),
@@ -588,7 +588,7 @@ function turnover(){
         <span class="note">National rank</span><span class="num">#${r0} → #${r1} <span class="dl ${dr > 0 ? 'up' : dr < 0 ? 'dn' : ''}">${dr > 0 ? '▲' + dr : dr < 0 ? '▼' + (-dr) : 'even'}</span></span>
         <div class="tcounts">
           <span>Leaving: out of eligibility <button class="tap" type="button" data-k="${k('leaveE')}">${L.leaveE.length}</button> · transfer portal <button class="tap" type="button" data-k="${k('leaveP')}">${L.leaveP.length}</button></span>
-          <span>2027 commits in <button class="tap" type="button" data-k="${k('arrive')}">${L.arrive.length}</button></span>
+          <span>2027 arrivals in <button class="tap" type="button" data-k="${k('arrive')}">${L.arrive.length}</button></span>
           <span>Returning <button class="tap" type="button" data-k="${k('ret')}">${L.ret.length}</button></span>
           <span>2026 transfers in <button class="tap" type="button" data-k="${k('tin')}">${L.tin.length}</button></span>
           <span>Lost to transfer <button class="tap" type="button" data-k="${k('lost')}">${L.lost.length}</button></span>
@@ -694,7 +694,7 @@ function openSheet(key){
   if (kind === 'turn'){
     const [, team, side, x] = parts; const L = turnLists(team, side, t);
     ps = L[x]; const sd = side === 'O' ? 'offense' : 'defense';
-    title = {out: `${team}: not available now`, fresh: `${team}: freshmen in the ${tn(t)}`, leaveE: `${team}: leaving, out of eligibility`, leaveP: `${team}: leaving, transfer portal`, leave: `${team}: leaving`, arrive: `${team}: 2027 commits in the ${tn(t)}`, ret: `${team}: returning in 2027`, tin: `${team}: 2026 transfers in`, lost: `${team}: lost to transfer`}[x];
+    title = {out: `${team}: not available now`, fresh: `${team}: freshmen in the ${tn(t)}`, leaveE: `${team}: leaving, out of eligibility`, leaveP: `${team}: leaving, transfer portal`, leave: `${team}: leaving`, arrive: `${team}: 2027 arrivals (commits and transfers) in the ${tn(t)}`, ret: `${team}: returning in 2027`, tin: `${team}: 2026 transfers in`, lost: `${team}: lost to transfer`}[x];
     sub = {out: `Would be in the 2026 ${tn(t)} ${sd} on season snaps; dropped from remaining-game projections`, fresh: `True freshmen (2026 class) in the 2026 ${tn(t)} ${sd}: early equity`, leaveE: `Seniors and graduates in the 2026 ${tn(t)} ${sd}`, leaveP: `Announced portal entrants in the 2026 ${tn(t)} ${sd} (the portal window opens in January)`, leave: `Seniors and graduates in the 2026 ${tn(t)} ${sd}`, arrive: `Projected 2027 ${tn(t)} ${sd}`, ret: `Projected 2027 ${tn(t)} ${sd}`, tin: `2026 ${tn(t)} ${sd} · from another 2025 roster`, lost: `On ${team}'s 2025 roster, now in another team's 2026 Three-Deep ${sd}`}[x] + ` · ${ps.length} players`;
     $('shTitle').textContent = title; $('shSub').textContent = sub;
     $('shBody').innerHTML = x === 'lost' ? lostRows(ps) : playerRows(ps, S.svc, x === 'arrive' || x === 'ret' ? 2027 : 2026);

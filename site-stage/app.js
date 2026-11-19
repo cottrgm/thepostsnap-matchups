@@ -227,7 +227,7 @@
     { id: 'overview', label: 'Overview', nums: ['01', '31', '21', '20', '30', '02', '03', '07', '16'] },
     { id: 'playcalling', label: 'Playcalling', nums: ['12', '33', '13', '23', '24', '29', '06'] },
     { id: 'field', label: 'On the field', nums: ['14', '05'] },
-    { id: 'units', label: 'Players & units', nums: ['15', '32', '22', '27', '28', '17', '08'] },
+    { id: 'units', label: 'Players & units', nums: ['15', '32', '22', '34', '27', '28', '17', '08'] },
     { id: 'matchups', label: 'Matchups', nums: ['19'] },
     { id: 'compare', label: 'Compare', nums: ['25', '26', '09', '18', '11', '10', '04'] }
   ];
@@ -266,7 +266,7 @@
   function muQueue() { if (muQueued) return; muQueued = true; setTimeout(function () { muQueued = false; muView(); }, 60); }
   window.addEventListener('scroll', muQueue, { passive: true });
   window.addEventListener('resize', muQueue);
-  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); }, '31': function () { buildReview(); }, '32': function () { buildHighs(); }, '33': function () { buildPcGames(); } };
+  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); }, '31': function () { buildReview(); }, '32': function () { buildHighs(); }, '33': function () { buildPcGames(); }, '34': function () { buildIncoming(); } };
   state.teamTab = state.teamTab || 'overview'; state.gSide = state.gSide || 0;
   state.liveKey = 0; state.liveDone = {};
 
@@ -4216,13 +4216,13 @@
     var g = {};
     P.forEach(function (p) {
       var k = p[9] || p[3]; g[k] = g[k] || { snaps: 0, leaving: 0, nLeave: 0, commits: 0, names: [] };
-      if (p[6] === 'C') { g[k].commits++; return; }
+      if (p[6] === 'C' || p[6] === 'TC') { g[k].commits++; return; }
       g[k].snaps += +p[15] || 0;
       if (p[14] === 'E' || p[14] === 'P') { g[k].leaving += +p[15] || 0; g[k].nLeave++; if ((+p[15] || 0) >= 150) g[k].names.push(p[4]); }
     });
     var keys = Object.keys(g).filter(function (k) { return g[k].snaps || g[k].commits; }).sort(function (a, b) { return (g[b].leaving / Math.max(1, g[b].snaps)) - (g[a].leaving / Math.max(1, g[a].snaps)); });
     host.appendChild(h('h3', 'fdh', 'Who is leaving against who is coming'));
-    var X = tbl(['Group', 'Snaps leaving', 'Share of the group\'s snaps', 'Main players leaving', '2027 commits']);
+    var X = tbl(['Group', 'Snaps leaving', 'Share of the group\'s snaps', 'Main players leaving', '2027 arrivals']);
     keys.forEach(function (k) {
       var x = g[k], tr = h('tr'); tr.appendChild(td('pclab', k));
       tr.appendChild(td('nd', x.leaving ? x.leaving.toLocaleString() + ' (' + x.nLeave + ')' : '–'));
@@ -4231,7 +4231,7 @@
       X.tb.appendChild(tr);
     });
     host.appendChild(X.wrap);
-    host.appendChild(h('p', 'tblnote', 'Snaps are this season\'s PFF snaps for the Three-Deep at each position group on the matchup board. Leaving means out of eligibility after this season or an announced transfer; players who could return for another year are not counted, and the portal will change this in December. Commits are the 2027 high-school class by the board\'s position groups.'));
+    host.appendChild(h('p', 'tblnote', 'Snaps are this season\'s PFF snaps for the Three-Deep at each position group on the matchup board. Leaving means out of eligibility after this season or an announced transfer; players who could return for another year are not counted, and the portal will change this in December. Arrivals are the 2027 high-school class plus 2027 portal commitments, by the board\'s position groups.'));
   }
 
   /* =====================================================================
@@ -4409,7 +4409,7 @@
         var tbl0 = tr.closest('.tablewrap'), h3 = tbl0 && tbl0.previousElementSibling, team = h3 && h3.textContent;
         var x = outs.filter(function (o) { return o.team === team && c.textContent.indexOf(o.player) === 0; })[0]; if (!x) return;
         var T = SC_BOARD_NAME[team] || team;
-        var p = (D.players || []).filter(function (q) { return q[0] === T && q[4] === x.player && q[6] !== 'C'; })[0];
+        var p = (D.players || []).filter(function (q) { return q[0] === T && q[4] === x.player && q[6] !== 'C' && q[6] !== 'TC'; })[0];
         if (!p || !p[15]) return;
         c.appendChild(h('span', 'injrole injsnap', p[15] + ' snaps · #' + p[19] + ' on the ' + (p[1] === 'O' ? 'offense' : 'defense') + ' in playing time' + (p[19] <= 22 ? ' (Two-Deep)' : '')));
       });
@@ -4705,6 +4705,82 @@
       var note = h('caption', 'tblnote drvnote', 'Tap a drive for every play on it, flags included. Began and ended are the game clock; a drive ends when the next one begins, and the last drive of a half runs to the end of the quarter, so time is how long the drive held the ball (two-minute drills and kneels included). Start is where the first snap was; yards run from there to where the last snap ended, so penalty yards count. Plays and the EPA column are snaps only; gray rows are kicks and flagged rows are penalties that wiped out the play or were called on their own. Net on a punt runs from the line of scrimmage to where the other team took over. * = the play log stops before the drive ends, so the result is read from where the other team took over: well down the field means a punt, about where the ball was means a turnover. A drive with no clue either way shows as “Not in the play log.”');
       note.style.captionSide = 'bottom'; dt.appendChild(note);
     }).catch(function () { dt.innerHTML = ''; fallback(); });
+  }
+
+  /* ---- team page: everyone coming in for next season, high school and transfer, in one list ---- */
+  function incNorm(n) { return String(n || '').toLowerCase().replace(/[-.']/g, ' ').replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '').replace(/[^a-z]/g, ''); }
+  function incStar(D, p) {
+    if (p == null) return null;
+    var c = (D && D.star_cuts) || { 5: 98.9, 4: 91.1, 3: 19.6 };
+    if (p >= c[5]) return 5;
+    if (p >= c[4]) return 4 + (p - c[4]) / (c[5] - c[4]);
+    if (p >= c[3]) return 3 + (p - c[3]) / (c[4] - c[3]);
+    return 2 + Math.max(0, p) / c[3];
+  }
+  function buildIncoming() {
+    var host = document.getElementById('incomingBody'); if (!host) return;
+    var team = state.team; p5Loading(host);
+    Promise.all([xGet('incoming', { team: team }), scGet('api/matchups-data').catch(function () { return null; })]).then(function (r) {
+      if (team !== state.team) return;
+      var j = r[0] || {}, D = r[1], T = SC_BOARD_NAME[team] || team;
+      host.innerHTML = '';
+      /* the board's percentile across every service for each incoming player, matched by name */
+      var B = {};
+      ((D && D.players) || []).forEach(function (p) { if (p[0] === T && (p[6] === 'C' || p[6] === 'TC')) B[incNorm(p[4])] = p; });
+      var allOf = function (name) { var p = B[incNorm(name)]; return p ? p[11] : null; };
+      var starCell = function (v) {
+        var s = incStar(D, v), c = td('nd', s == null ? '–' : (s >= 5 ? '5.0' : (Math.floor(s * 10) / 10).toFixed(1)) + '★');
+        if (s != null) { c.style.color = 'var(--gold, #b7791f)'; c.title = 'Star equivalent of his average percentile across every service'; }
+        return c;
+      };
+      var HS = j.hs || [], TI = j.transfers_in || [], TO = j.transfers_out || [];
+      var blue = HS.filter(function (x) { return x.stars >= 4; }).length;
+      p5Cards(host, [['High-school commits', String(HS.length), blue + ' four- or five-star'],
+        ['Transfers in', j.portal_open ? String(TI.length) : '–', j.portal_open ? 'committed from the portal' : 'portal opens in January'],
+        ['Transfers out', j.portal_open ? String(TO.length) : '–', j.portal_open ? 'left ' + team + ' in the portal' : '']]);
+
+      host.appendChild(h('h3', 'fdh', 'High-school commits (' + HS.length + ')'));
+      if (!HS.length) host.appendChild(h('p', 'ax', 'No commitments on file yet for ' + j.year + '.'));
+      else {
+        var X = tbl(['Commit', 'Pos', 'Stars', 'Composite', 'National', 'From', 'All pctl', 'Star eq.']);
+        HS.forEach(function (c) {
+          var tr = h('tr'), a = allOf(c.name);
+          tr.appendChild(td('pclab', c.name)); tr.appendChild(td('nd', c.pos || '–'));
+          tr.appendChild(td('nd', c.stars ? '★'.repeat(c.stars) : '–')); tr.appendChild(td('nd', c.rating ? num(+c.rating, 4) : '–'));
+          tr.appendChild(td('nd', c.ranking ? '#' + c.ranking : '–'));
+          tr.appendChild(td(null, [c.school, [c.city, c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ') || '–'));
+          tr.appendChild(td('nd', a == null ? '–' : num(+a, 1))); tr.appendChild(starCell(a));
+          X.tb.appendChild(tr);
+        });
+        host.appendChild(X.wrap);
+      }
+
+      host.appendChild(h('h3', 'fdh', 'Transfers in (' + (j.portal_open ? TI.length : 0) + ')'));
+      if (!j.portal_open) host.appendChild(h('p', 'ax', 'The ' + j.year + ' transfer portal opens in January. Commitments show up here the morning after they are reported.'));
+      else if (!TI.length) host.appendChild(h('p', 'ax', 'No portal commitments to ' + team + ' yet.'));
+      else {
+        var Y = tbl(['Player', 'Pos', 'From', 'Stars', '247 transfer rating', 'All pctl', 'Star eq.']);
+        TI.forEach(function (c) {
+          var tr = h('tr'), a = allOf(c.name);
+          tr.appendChild(td('pclab', c.name)); tr.appendChild(td('nd', c.pos || '–')); tr.appendChild(td(null, c.from_team || '–'));
+          tr.appendChild(td('nd', c.stars ? '★'.repeat(c.stars) : '–')); tr.appendChild(td('nd', c.rating ? num(+c.rating, 2) : '–'));
+          tr.appendChild(td('nd', a == null ? '–' : num(+a, 1))); tr.appendChild(starCell(a));
+          Y.tb.appendChild(tr);
+        });
+        host.appendChild(Y.wrap);
+      }
+      if (j.portal_open && TO.length) {
+        host.appendChild(h('h3', 'fdh', 'Transfers out (' + TO.length + ')'));
+        var Z = tbl(['Player', 'Pos', 'Now at', 'Stars', '247 transfer rating']);
+        TO.forEach(function (c) {
+          var tr = h('tr'); tr.appendChild(td('pclab', c.name)); tr.appendChild(td('nd', c.pos || '–'));
+          tr.appendChild(td(null, c.to_team || 'uncommitted')); tr.appendChild(td('nd', c.stars ? '★'.repeat(c.stars) : '–'));
+          tr.appendChild(td('nd', c.rating ? num(+c.rating, 2) : '–')); Z.tb.appendChild(tr);
+        });
+        host.appendChild(Z.wrap);
+      }
+      host.appendChild(h('p', 'tblnote', 'High-school commits are the 247Sports Composite list through CollegeFootballData; transfers are the CollegeFootballData portal feed (247Sports). Both refresh every morning, and commitments can change until signing day. All pctl is the matchup board\'s number: his average percentile across every service that rates him, using a transfer\'s original high-school ratings when he has them. Star eq. turns that percentile into stars using the 247 Composite\'s lines (5★ = top 1.1% of recruits, 4★ = top 8.9%, 3★ = top 80%); the decimal is how far up the band he sits. The board picks up new names at its next rebuild, so a brand-new commit can show a dash there for a day or two.'));
+    }).catch(function (e) { p5Fail(host, e); });
   }
 
   /* =====================================================================
