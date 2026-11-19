@@ -4727,7 +4727,18 @@
       /* the board's percentile across every service for each incoming player, matched by name */
       var B = {};
       ((D && D.players) || []).forEach(function (p) { if (p[0] === T && (p[6] === 'C' || p[6] === 'TC')) B[incNorm(p[4])] = p; });
-      var allOf = function (name) { var p = B[incNorm(name)]; return p ? p[11] : null; };
+      var words = function (n) { return String(n || '').toLowerCase().replace(/[-.']/g, ' ').replace(/\b(jr|sr|ii|iii|iv|v)\b/g, '').trim().split(/\s+/); };
+      var allOf = function (name) {
+        var p = B[incNorm(name)];
+        if (!p) {   /* nicknames: 'Khamoni Williams' on one list is 'Moni Williams' on another */
+          var a = words(name), fa = a.slice(0, -1).join('');
+          Object.keys(B).forEach(function (k) {
+            var b = words(B[k][4]), fb = b.slice(0, -1).join('');
+            if (!p && a[a.length - 1] === b[b.length - 1] && fa && fb && (fa.indexOf(fb) >= 0 || fb.indexOf(fa) >= 0)) p = B[k];
+          });
+        }
+        return p ? p[11] : null;
+      };
       var starCell = function (v) {
         var s = incStar(D, v), c = td('nd', s == null ? '–' : (s >= 5 ? '5.0' : (Math.floor(s * 10) / 10).toFixed(1)) + '★');
         if (s != null) { c.style.color = 'var(--gold, #b7791f)'; c.title = 'Star equivalent of his average percentile across every service'; }
