@@ -224,7 +224,7 @@
      deeper numbers) share one filter bar and one offense/defense switch, and only load when
      their tab is open. The address bar always holds the current view, so a link reopens it. */
   var TEAM_TABS = [
-    { id: 'overview', label: 'Overview', nums: ['01', '31', '21', '20', '30', '02', '03', '07', '16'] },
+    { id: 'overview', label: 'Overview', nums: ['01', '35', '31', '21', '20', '30', '02', '03', '07', '16'] },
     { id: 'playcalling', label: 'Playcalling', nums: ['12', '33', '13', '23', '24', '29', '06'] },
     { id: 'field', label: 'On the field', nums: ['14', '05'] },
     { id: 'units', label: 'Players & units', nums: ['15', '32', '22', '34', '27', '28', '17', '08'] },
@@ -266,7 +266,7 @@
   function muQueue() { if (muQueued) return; muQueued = true; setTimeout(function () { muQueued = false; muView(); }, 60); }
   window.addEventListener('scroll', muQueue, { passive: true });
   window.addEventListener('resize', muQueue);
-  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); }, '31': function () { buildReview(); }, '32': function () { buildHighs(); }, '33': function () { buildPcGames(); }, '34': function () { buildIncoming(); } };
+  var LAZY = { '25': function () { buildProgram(); }, '26': function () { buildComps(); }, '27': function () { buildPortal(); }, '22': function () { buildPressure(); }, '23': function () { buildSitu(); }, '24': function () { buildFourth(); }, '20': function () { buildAdj(); }, '21': function () { buildTrend(); }, '19': function () { buildTeamMatchups(); }, '16': function () { buildATS(); }, '17': function () { buildTeamTalent(); }, '18': function () { buildYoY(); buildHistory(); }, '28': function () { buildRecruits(); }, '29': function () { buildHalves(); }, '30': function () { buildUnitGames(); }, '31': function () { buildReview(); }, '32': function () { buildHighs(); }, '33': function () { buildPcGames(); }, '34': function () { buildIncoming(); }, '35': function () { buildRanks(); } };
   state.teamTab = state.teamTab || 'overview'; state.gSide = state.gSide || 0;
   state.liveKey = 0; state.liveDone = {};
 
@@ -4791,6 +4791,106 @@
         host.appendChild(Z.wrap);
       }
       host.appendChild(h('p', 'tblnote', 'High-school commits are the 247Sports Composite list through CollegeFootballData; transfers are the CollegeFootballData portal feed (247Sports). Both refresh every morning, and commitments can change until signing day. All pctl is the matchup board\'s number: his average percentile across every service that rates him, using a transfer\'s original high-school ratings when he has them. Star eq. turns that percentile into stars using the 247 Composite\'s lines (5★ = top 1.1% of recruits, 4★ = top 8.9%, 3★ = top 80%); the decimal is how far up the band he sits. The board picks up new names at its next rebuild, so a brand-new commit can show a dash there for a day or two.'));
+    }).catch(function (e) { p5Fail(host, e); });
+  }
+
+  /* ---- team page: where this team ranks in FBS, unit by unit and group by group ---- */
+  var RK_GROUPS = { O: ['QB', 'RB', 'WR', 'TE', 'OL'], D: ['DL', 'LB', 'DB'] };
+  var RK_GNAME = { QB: 'Quarterbacks', RB: 'Running backs', WR: 'Wide receivers', TE: 'Tight ends', OL: 'Offensive line', DL: 'Defensive line', LB: 'Linebackers', DB: 'Secondary' };
+  /* board talent: each team's percentile for a unit or one position group at a depth, ranked across FBS */
+  function rkTalent(D, side, tier) {
+    var by = {}, teams = Object.keys(D.talent || {});
+    (D.players || []).forEach(function (p) {
+      if (p[1] !== side || p[6] === 'C' || p[6] === 'TC' || !p[2] || p[2] > tier) return;
+      var t = by[p[0]] = by[p[0]] || {}; (t[p[9]] = t[p[9]] || []).push(p[11] == null ? 0 : +p[11]);
+    });
+    var out = {};
+    teams.forEach(function (t) {
+      var r = { unit: (D.talent[t][side + tier] || {}).ALL ? D.talent[t][side + tier].ALL[3] : null };
+      RK_GROUPS[side].forEach(function (g) { var v = (by[t] || {})[g]; r[g] = v && v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null; r[g + 'N'] = v ? v.length : 0; });
+      out[t] = r;
+    });
+    ['unit'].concat(RK_GROUPS[side]).forEach(function (k) {
+      var vals = teams.map(function (t) { return out[t][k]; }).filter(function (v) { return v != null; });
+      teams.forEach(function (t) { var v = out[t][k]; out[t][k + 'Rk'] = v == null ? null : 1 + vals.filter(function (x) { return x > v; }).length; out[t].pool = vals.length; });
+    });
+    return out;
+  }
+  function buildRanks() {
+    var host = document.getElementById('ranksBody'); if (!host) return;
+    var team = state.team; state.rkTier = state.rkTier || 22; p5Loading(host);
+    Promise.all([xGet('ranks', { team: team, season: state.season }), scGet('api/matchups-data').catch(function () { return null; })]).then(function (r) {
+      if (team !== state.team) return;
+      var j = r[0] || {}, D = r[1], T = SC_BOARD_NAME[team] || team, A = j.adj || {}, SP = j.sp || {}, ST = j.st || {}, NAT = j.st_nat || {};
+      host.innerHTML = '';
+      var tierName = { 11: 'Starting 11', 22: 'Two-Deep', 33: 'Three-Deep' };
+      var TO = D && D.talent && D.talent[T] ? rkTalent(D, 'O', state.rkTier) : null, TD = TO ? rkTalent(D, 'D', state.rkTier) : null;
+      var rkCell = function (rk, pool) { var c = td('nd pcshade', rk ? '#' + rk : '–'); if (rk) { c.style.background = xRankBg(rk, pool); c.title = '#' + rk + ' of ' + pool + ' FBS teams'; } return c; };
+      var stq = function (v) { if (v == null || !D) return ''; var s = incStar(D, v); return ' · ' + (s >= 5 ? '5.0' : (Math.floor(s * 10) / 10).toFixed(1)) + '★'; };
+
+      /* 1. the three units */
+      var a = function (k) { return A[k] || {}; };
+      p5Cards(host, [
+        ['Offense', a('Offense:epa').rk ? '#' + a('Offense:epa').rk : '–', 'opponent-adjusted EPA per play' + (SP.spo_rk ? ' · SP+ #' + SP.spo_rk : '')],
+        ['Defense', a('Defense:epa').rk ? '#' + a('Defense:epa').rk : '–', 'opponent-adjusted EPA per play' + (SP.spd_rk ? ' · SP+ #' + SP.spd_rk : '')],
+        ['Special teams', ST.sp_st ? '#' + ST.sp_st.rk : '–', 'SP+ special teams' + (ST.fpi_st ? ' · FPI #' + ST.fpi_st.rk : '')]]);
+      var X = tbl(['Unit', 'How it plays', 'Rank', 'SP+ rank', 'Talent (' + tierName[state.rkTier] + ')', 'Rank']);
+      var row = function (lab, perf, prk, sprk, tal, trk, pool) {
+        var tr = h('tr'); tr.appendChild(td('pclab', lab)); tr.appendChild(td('nd', perf)); tr.appendChild(rkCell(prk, 138)); tr.appendChild(rkCell(sprk, 138));
+        tr.appendChild(td('nd', tal == null ? '–' : num(+tal, 1) + stq(tal))); tr.appendChild(rkCell(trk, pool)); X.tb.appendChild(tr);
+      };
+      var o = TO && TO[T], d = TD && TD[T];
+      row('Offense', a('Offense:epa').adj != null ? sgn(+a('Offense:epa').adj, 2) + ' EPA/play' : '–', a('Offense:epa').rk, SP.spo_rk, o && o.unit, o && o.unitRk, o && o.pool);
+      row('Passing offense', a('Offense:epa_pass').adj != null ? sgn(+a('Offense:epa_pass').adj, 2) : '–', a('Offense:epa_pass').rk, null, null, null);
+      row('Rushing offense', a('Offense:epa_run').adj != null ? sgn(+a('Offense:epa_run').adj, 2) : '–', a('Offense:epa_run').rk, null, null, null);
+      row('Defense', a('Defense:epa').adj != null ? sgn(+a('Defense:epa').adj, 2) + ' EPA/play' : '–', a('Defense:epa').rk, SP.spd_rk, d && d.unit, d && d.unitRk, d && d.pool);
+      row('Pass defense', a('Defense:epa_pass').adj != null ? sgn(+a('Defense:epa_pass').adj, 2) : '–', a('Defense:epa_pass').rk, null, null, null);
+      row('Run defense', a('Defense:epa_run').adj != null ? sgn(+a('Defense:epa_run').adj, 2) : '–', a('Defense:epa_run').rk, null, null, null);
+      row('Special teams', ST.sp_st ? sgn(+ST.sp_st.v, 1) + ' SP+' : '–', ST.sp_st && ST.sp_st.rk, ST.sp_st && ST.sp_st.rk, null, null);
+      host.appendChild(X.wrap);
+
+      /* 2. position groups (talent) */
+      host.appendChild(h('h3', 'fdh', 'Position groups'));
+      var ctl = h('div', 'segs'); host.appendChild(ctl);
+      segs(ctl, ['Starting 11', 'Two-Deep', 'Three-Deep'], [11, 22, 33].indexOf(state.rkTier), function (i) { state.rkTier = [11, 22, 33][i]; buildRanks(); });
+      if (!TO) host.appendChild(h('p', 'ax', 'Talent rankings come from the matchup board, which is not available right now.'));
+      else {
+        var wrap = h('div', 'portalcols');
+        [['O', 'Offense', TO], ['D', 'Defense', TD]].forEach(function (s) {
+          var col = h('div', 'portalcol'); col.appendChild(h('h3', 'fdh', s[1]));
+          var G = tbl(['Group', 'Players', 'Talent', 'Star eq.', 'FBS rank']), me = s[2][T];
+          RK_GROUPS[s[0]].forEach(function (g) {
+            var tr = h('tr'); tr.appendChild(td('pclab', RK_GNAME[g])); tr.appendChild(td('nd', me[g + 'N'] || '–'));
+            tr.appendChild(td('nd', me[g] == null ? '–' : num(+me[g], 1)));
+            var st = me[g] == null ? null : incStar(D, me[g]); tr.appendChild(td('nd', st == null ? '–' : (st >= 5 ? '5.0' : (Math.floor(st * 10) / 10).toFixed(1)) + '★'));
+            tr.appendChild(rkCell(me[g + 'Rk'], me.pool)); G.tb.appendChild(tr);
+          });
+          col.appendChild(G.wrap); wrap.appendChild(col);
+        });
+        host.appendChild(wrap);
+      }
+
+      /* 3. special teams, piece by piece */
+      host.appendChild(h('h3', 'fdh', 'Special teams and field position'));
+      var S = tbl(['', 'This team', 'FBS average', 'FBS rank', 'Plays']);
+      var f1 = function (v) { return num(+v, 1); }, pc = function (v) { return pct(+v, 0); }, yl = function (v) { return 'own ' + num(+v, 1); };
+      [['Special teams overall (SP+)', 'sp_st', function (v) { return sgn(+v, 1); }],
+       ['Special teams overall (FPI)', 'fpi_st', f1],
+       ['Kickoff coverage: where opponents start', 'ko_cov', yl],
+       ['Kick returns: where this team starts', 'kr_start', yl],
+       ['Punt returns: yards per return', 'pr_avg', f1],
+       ['Punting: net yards per punt', 'net_punt', f1],
+       ['Field goals made', 'fg_pct', pc],
+       ['Field goals from 40+', 'fg40', pc],
+       ['Kick and punt return touchdowns', 'ret_td', function (v) { return String(Math.round(+v)); }],
+       ['Starting field position, offense', 'start_off', yl],
+       ['Starting field position, defense (opponents)', 'start_def', yl]].forEach(function (m) {
+        var x = ST[m[1]], tr = h('tr'); tr.appendChild(td('pclab', m[0]));
+        tr.appendChild(td('nd', x ? m[2](x.v) : '–')); tr.appendChild(td('nd', NAT[m[1]] != null ? m[2](NAT[m[1]]) : '–'));
+        tr.appendChild(rkCell(x && x.rk, x && x.pool)); tr.appendChild(td('nd', x && x.n != null ? x.n : '–')); S.tb.appendChild(tr);
+      });
+      host.appendChild(S.wrap);
+      host.appendChild(h('p', 'tblnote', 'Ranks are against all FBS teams; blue is near the top, red near the bottom. How it plays: EPA per play adjusted for the opponents faced (the site\'s schedule-adjusted ratings), with SP+ for comparison; special teams overall is SP+\'s special teams rating, with ESPN FPI\'s special teams efficiency below. Talent is the matchup board\'s All Services percentile for the players a unit or group has in the chosen depth (unrated players count as 0), with its star equivalent; groups follow the depth chart\'s positions. Kickoff coverage and kick returns are where the drive after a kickoff starts, in yards from that offense\'s goal line (lower is better for coverage). Net punting takes off return yards and touchbacks. Field position is the average start of every drive. Plays = kicks, punts, returns, attempts or drives behind each number. Updated twice a day.'));
     }).catch(function (e) { p5Fail(host, e); });
   }
 
